@@ -78,35 +78,39 @@ renderer.list = function (token: any) {
   return `<${tag}${cls}${startAttr}>${body}</${tag}>\n`;
 };
 
+// Current file directory, set before each render pass
+let currentFileDir = "";
+
+renderer.image = function (token: any) {
+  const src: string = token.href || "";
+  const alt: string = token.text || "";
+  const title: string = token.title || "";
+
+  let resolvedSrc = src;
+  if (!src.startsWith("http://") && !src.startsWith("https://") && !src.startsWith("data:")) {
+    // Rewrite relative/absolute local paths to custom protocol
+    // The main process validates against allowedRoots when serving
+    const cleanSrc = src.replace(/^\.\//, "");
+    const absolutePath = currentFileDir + "/" + cleanSrc;
+    resolvedSrc = "local-img://" + absolutePath;
+  }
+
+  const titleAttr = title ? ` title="${title}"` : "";
+  return `<img src="${resolvedSrc}" alt="${alt}"${titleAttr} />`;
+};
+
 marked.use({ renderer });
 
-function renderMarkdown(content: string): string {
+function renderMarkdown(content: string, filePath: string): string {
+  // Set current directory for image resolution during this parse
+  currentFileDir = filePath.replace(/[/\\][^/\\]+$/, "");
   const raw = marked.parse(content) as string;
   return DOMPurify.sanitize(raw, {
     ADD_TAGS: ["input"],
     ADD_ATTR: ["checked", "disabled", "type"],
     ADD_URI_SAFE_ATTR: ["src"],
-    ALLOWED_URI_REGEXP: /^(?:(?:https?|file|data|mailto):|[^a-z]|[a-z+.-]+(?:[^a-z+.\-:]|$))/i,
+    ALLOWED_URI_REGEXP: /^(?:(?:https?|local-img|data|mailto):|[^a-z]|[a-z+.-]+(?:[^a-z+.\-:]|$))/i,
   });
-}
-
-async function resolveImages(container: HTMLElement, filePath: string): Promise<void> {
-  const images = container.querySelectorAll("img");
-  const promises: Promise<void>[] = [];
-  for (const img of images) {
-    const src = img.getAttribute("src");
-    if (!src) continue;
-    if (src.startsWith("http://") || src.startsWith("https://") || src.startsWith("data:")) continue;
-    // Route through guarded IPC — main process validates against allowedRoots
-    promises.push(
-      window.api.resolveImage(filePath, src).then((resolved) => {
-        img.src = resolved;
-      }).catch(() => {
-        // Access denied or file not found — leave as-is
-      })
-    );
-  }
-  await Promise.all(promises);
 }
 
 const isMac = navigator.platform.includes("Mac");
@@ -119,7 +123,6 @@ export function MarkdownPreview() {
   const setMarkdownContent = useAppStore((s) => s.setMarkdownContent);
   const fontSize = useAppStore((s) => s.fontSize);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!selectedFile) return;
@@ -138,16 +141,9 @@ export function MarkdownPreview() {
   }, [selectedFile, setMarkdownContent]);
 
   const html = useMemo(() => {
-    if (!markdownContent) return "";
-    return renderMarkdown(markdownContent);
-  }, [markdownContent]);
-
-  // Resolve relative image paths via guarded IPC after HTML injection
-  useEffect(() => {
-    if (contentRef.current && selectedFile && html) {
-      resolveImages(contentRef.current, selectedFile);
-    }
-  }, [html, selectedFile]);
+    if (!markdownContent || !selectedFile) return "";
+    return renderMarkdown(markdownContent, selectedFile);
+  }, [markdownContent, selectedFile]);
 
   if (!selectedFile) {
     return (
@@ -191,7 +187,6 @@ export function MarkdownPreview() {
         style={{ fontSize: `${fontSize}px` }}
       >
         <div
-          ref={contentRef}
           className="preview-content"
           dangerouslySetInnerHTML={{ __html: html }}
         />

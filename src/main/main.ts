@@ -1,4 +1,12 @@
-import { app, BrowserWindow, ipcMain, dialog, shell } from "electron";
+import {
+  app,
+  BrowserWindow,
+  ipcMain,
+  dialog,
+  shell,
+  protocol,
+  net,
+} from "electron";
 import * as path from "path";
 import * as fs from "fs";
 
@@ -226,7 +234,39 @@ function sendInitialPath(targetPath: string): void {
   }
 }
 
+// Register custom protocol for secure local image loading
+// Images are rewritten to local-img:///<absolute-path> in the renderer,
+// and this handler validates against allowedRoots before serving.
+protocol.registerSchemesAsPrivileged([
+  { scheme: "local-img", privileges: { bypassCSP: false, supportFetchAPI: true, stream: true } },
+]);
+
 app.whenReady().then(() => {
+  protocol.handle("local-img", (request) => {
+    // URL: local-img:///absolute/path/to/image.png
+    let filePath: string;
+    try {
+      const url = new URL(request.url);
+      filePath = decodeURIComponent(url.pathname);
+      // On Windows, pathname starts with /C:/... — strip leading slash
+      if (process.platform === "win32" && filePath.startsWith("/")) {
+        filePath = filePath.slice(1);
+      }
+    } catch {
+      return new Response("Invalid URL", { status: 400 });
+    }
+
+    if (!isPathAllowed(filePath)) {
+      return new Response("Access denied", { status: 403 });
+    }
+
+    try {
+      return net.fetch(`file://${filePath}`);
+    } catch {
+      return new Response("Not found", { status: 404 });
+    }
+  });
+
   createWindow();
 
   const initialPath = pendingFilePath || getInitialPath();
