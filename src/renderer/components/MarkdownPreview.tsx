@@ -91,8 +91,9 @@ renderer.image = function (token: any) {
     // Rewrite relative/absolute local paths to custom protocol
     // The main process validates against allowedRoots when serving
     const cleanSrc = src.replace(/^\.\//, "");
-    const absolutePath = currentFileDir + "/" + cleanSrc;
-    resolvedSrc = "local-img://" + absolutePath;
+    const absolutePath = (currentFileDir + "/" + cleanSrc).replace(/\\/g, "/");
+    const urlPath = absolutePath.startsWith("/") ? absolutePath : "/" + absolutePath;
+    resolvedSrc = "local-img://" + urlPath;
   }
 
   const titleAttr = title ? ` title="${title}"` : "";

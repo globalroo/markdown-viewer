@@ -22,9 +22,6 @@ const api = {
   readFile: (filePath: string): Promise<string> =>
     ipcRenderer.invoke("read-file", filePath),
 
-  resolveImage: (markdownPath: string, imageSrc: string): Promise<string> =>
-    ipcRenderer.invoke("resolve-image", markdownPath, imageSrc),
-
   showInFolder: (filePath: string): Promise<void> =>
     ipcRenderer.invoke("show-in-folder", filePath),
 

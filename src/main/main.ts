@@ -9,6 +9,7 @@ import {
 } from "electron";
 import * as path from "path";
 import * as fs from "fs";
+import { pathToFileURL } from "url";
 
 let mainWindow: BrowserWindow | null = null;
 let pendingFilePath: string | null = null;
@@ -169,22 +170,6 @@ ipcMain.handle(
   }
 );
 
-ipcMain.handle(
-  "resolve-image",
-  async (_event, markdownPath: string, imageSrc: string): Promise<string> => {
-    if (imageSrc.startsWith("http://") || imageSrc.startsWith("https://")) {
-      return imageSrc;
-    }
-    const dir = path.dirname(markdownPath);
-    const resolved = path.resolve(dir, imageSrc);
-    if (!isPathAllowed(resolved)) return imageSrc;
-    if (fs.existsSync(resolved)) {
-      return `file://${resolved}`;
-    }
-    return imageSrc;
-  }
-);
-
 ipcMain.handle("show-in-folder", async (_event, filePath: string) => {
   if (!isPathAllowed(filePath)) throw new Error("Access denied");
   shell.showItemInFolder(filePath);
@@ -261,7 +246,7 @@ app.whenReady().then(() => {
     }
 
     try {
-      return net.fetch(`file://${filePath}`);
+      return net.fetch(pathToFileURL(filePath).href);
     } catch {
       return new Response("Not found", { status: 404 });
     }
