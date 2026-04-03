@@ -9,7 +9,12 @@ let pendingFilePath: string | null = null;
 const allowedRoots = new Set<string>();
 
 function isPathAllowed(targetPath: string): boolean {
-  const resolved = path.resolve(targetPath);
+  let resolved: string;
+  try {
+    resolved = fs.realpathSync(targetPath);
+  } catch {
+    resolved = path.resolve(targetPath);
+  }
   for (const root of allowedRoots) {
     if (resolved.startsWith(root + path.sep) || resolved === root) return true;
   }
@@ -30,10 +35,10 @@ function createWindow(): void {
     },
   });
 
-  // Security: prevent navigation away from the app
+  // Security: block ALL navigation — this is an SPA, it should never navigate
   mainWindow.webContents.on("will-navigate", (event, url) => {
-    if (!url.startsWith("file://")) {
-      event.preventDefault();
+    event.preventDefault();
+    if (url.startsWith("http://") || url.startsWith("https://")) {
       shell.openExternal(url);
     }
   });
@@ -187,6 +192,8 @@ function getInitialPath(): string | null {
 // Buffer the path if the window isn't ready yet (cold launch)
 app.on("open-file", (_event, filePath) => {
   if (mainWindow) {
+    // Add parent directory to allowed roots so scan-directory works
+    allowedRoots.add(path.dirname(filePath));
     mainWindow.webContents.send("file-opened", filePath);
   } else {
     pendingFilePath = filePath;
