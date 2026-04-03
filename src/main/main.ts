@@ -3,6 +3,18 @@ import * as path from "path";
 import * as fs from "fs";
 
 let mainWindow: BrowserWindow | null = null;
+let pendingFilePath: string | null = null;
+
+// Track allowed project roots for IPC path validation
+const allowedRoots = new Set<string>();
+
+function isPathAllowed(targetPath: string): boolean {
+  const resolved = path.resolve(targetPath);
+  for (const root of allowedRoots) {
+    if (resolved.startsWith(root + path.sep) || resolved === root) return true;
+  }
+  return false;
+}
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -16,6 +28,20 @@ function createWindow(): void {
       contextIsolation: true,
       nodeIntegration: false,
     },
+  });
+
+  // Security: prevent navigation away from the app
+  mainWindow.webContents.on("will-navigate", (event, url) => {
+    if (!url.startsWith("file://")) {
+      event.preventDefault();
+      shell.openExternal(url);
+    }
+  });
+
+  // Security: open new windows (target="_blank" etc) in default browser
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    shell.openExternal(url);
+    return { action: "deny" };
   });
 
   if (process.env.NODE_ENV === "development") {
@@ -101,6 +127,7 @@ ipcMain.handle("open-folder", async () => {
   });
   if (result.canceled || result.filePaths.length === 0) return null;
   const dirPath = result.filePaths[0];
+  allowedRoots.add(dirPath);
   const tree = scanDirectory(dirPath);
   return { rootPath: dirPath, tree };
 });
@@ -108,6 +135,7 @@ ipcMain.handle("open-folder", async () => {
 ipcMain.handle(
   "scan-directory",
   async (_event, dirPath: string): Promise<TreeNode[]> => {
+    if (!isPathAllowed(dirPath)) throw new Error("Access denied");
     return scanDirectory(dirPath);
   }
 );
@@ -115,6 +143,7 @@ ipcMain.handle(
 ipcMain.handle(
   "read-file",
   async (_event, filePath: string): Promise<string> => {
+    if (!isPathAllowed(filePath)) throw new Error("Access denied");
     return readFileContent(filePath);
   }
 );
@@ -127,6 +156,7 @@ ipcMain.handle(
     }
     const dir = path.dirname(markdownPath);
     const resolved = path.resolve(dir, imageSrc);
+    if (!isPathAllowed(resolved)) return imageSrc;
     if (fs.existsSync(resolved)) {
       return `file://${resolved}`;
     }
@@ -135,6 +165,7 @@ ipcMain.handle(
 );
 
 ipcMain.handle("show-in-folder", async (_event, filePath: string) => {
+  if (!isPathAllowed(filePath)) throw new Error("Access denied");
   shell.showItemInFolder(filePath);
 });
 
@@ -145,34 +176,49 @@ function getInitialPath(): string | null {
   const target = path.resolve(args[0]);
   try {
     const stat = fs.statSync(target);
-    if (stat.isDirectory()) return target;
-    if (stat.isFile()) return target;
+    if (stat.isDirectory() || stat.isFile()) return target;
   } catch {
     // path doesn't exist
   }
   return null;
 }
 
-// Handle file opened via file association
+// Handle file opened via file association (macOS)
+// Buffer the path if the window isn't ready yet (cold launch)
 app.on("open-file", (_event, filePath) => {
   if (mainWindow) {
     mainWindow.webContents.send("file-opened", filePath);
+  } else {
+    pendingFilePath = filePath;
   }
 });
+
+function sendInitialPath(targetPath: string): void {
+  if (!mainWindow) return;
+  try {
+    const stat = fs.statSync(targetPath);
+    const dirPath = stat.isDirectory()
+      ? targetPath
+      : path.dirname(targetPath);
+    allowedRoots.add(dirPath);
+    if (stat.isDirectory()) {
+      mainWindow.webContents.send("open-directory", targetPath);
+    } else {
+      allowedRoots.add(path.dirname(targetPath));
+      mainWindow.webContents.send("file-opened", targetPath);
+    }
+  } catch {
+    // ignore invalid paths
+  }
+}
 
 app.whenReady().then(() => {
   createWindow();
 
-  // Send initial path to renderer once it's ready
-  const initialPath = getInitialPath();
+  const initialPath = pendingFilePath || getInitialPath();
   if (initialPath && mainWindow) {
     mainWindow.webContents.on("did-finish-load", () => {
-      const stat = fs.statSync(initialPath);
-      if (stat.isDirectory()) {
-        mainWindow!.webContents.send("open-directory", initialPath);
-      } else {
-        mainWindow!.webContents.send("file-opened", initialPath);
-      }
+      sendInitialPath(initialPath);
     });
   }
 

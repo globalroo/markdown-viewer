@@ -88,6 +88,10 @@ function renderMarkdown(content: string): string {
   });
 }
 
+const isMac = navigator.platform.includes("Mac");
+const mod = isMac ? "⌘" : "Ctrl+";
+const revealLabel = isMac ? "Reveal in Finder" : "Show in Explorer";
+
 export function MarkdownPreview() {
   const selectedFile = useAppStore((s) => s.selectedFile);
   const markdownContent = useAppStore((s) => s.markdownContent);
@@ -124,12 +128,12 @@ export function MarkdownPreview() {
           <h2>Markdown Viewer</h2>
           <p>Select a file from the sidebar to start reading</p>
           <div className="shortcut-list">
-            <div><kbd>⌘O</kbd> Open folder</div>
-            <div><kbd>⌘B</kbd> Toggle sidebar</div>
-            <div><kbd>⌘+</kbd> Increase font size</div>
-            <div><kbd>⌘-</kbd> Decrease font size</div>
-            <div><kbd>⌘D</kbd> Toggle theme</div>
-            <div><kbd>⌘P</kbd> Print document</div>
+            <div><kbd>{mod}O</kbd> Open folder</div>
+            <div><kbd>{mod}B</kbd> Toggle sidebar</div>
+            <div><kbd>{mod}+</kbd> Increase font size</div>
+            <div><kbd>{mod}-</kbd> Decrease font size</div>
+            <div><kbd>{mod}D</kbd> Toggle theme</div>
+            <div><kbd>{mod}P</kbd> Print document</div>
           </div>
         </div>
       </div>
@@ -147,7 +151,8 @@ export function MarkdownPreview() {
         <button
           className="preview-reveal-btn"
           onClick={() => window.api.showInFolder(selectedFile)}
-          title="Reveal in Finder"
+          aria-label={revealLabel}
+          title={revealLabel}
         >
           ↗
         </button>

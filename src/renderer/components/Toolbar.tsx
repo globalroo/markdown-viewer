@@ -1,5 +1,8 @@
 import { useAppStore } from "../store";
 
+const isMac = navigator.platform.includes("Mac");
+const mod = isMac ? "⌘" : "Ctrl+";
+
 export function Toolbar() {
   const {
     fontSize,
@@ -16,34 +19,38 @@ export function Toolbar() {
     theme === "system" ? "Auto" : theme === "light" ? "Light" : "Dark";
 
   return (
-    <div className="toolbar">
+    <div className="toolbar" role="toolbar" aria-label="Viewer controls">
       <button
         className="toolbar-btn"
         onClick={toggleSidebar}
-        title="Toggle sidebar (⌘B)"
+        aria-label="Toggle sidebar"
+        title={`Toggle sidebar (${mod}B)`}
       >
         ☰
       </button>
       <div className="toolbar-spacer" />
-      <div className="toolbar-group">
+      <div className="toolbar-group" role="group" aria-label="Font size">
         <button
           className="toolbar-btn"
           onClick={decreaseFontSize}
-          title="Decrease font size (⌘-)"
+          aria-label="Decrease font size"
+          title={`Decrease font size (${mod}-)`}
         >
           A-
         </button>
-        <span
+        <button
           className="toolbar-label"
           onClick={resetFontSize}
-          title="Reset font size (⌘0)"
+          aria-label={`Reset font size to 16px, currently ${fontSize}px`}
+          title={`Reset font size (${mod}0)`}
         >
           {fontSize}px
-        </span>
+        </button>
         <button
           className="toolbar-btn"
           onClick={increaseFontSize}
-          title="Increase font size (⌘+)"
+          aria-label="Increase font size"
+          title={`Increase font size (${mod}+)`}
         >
           A+
         </button>
@@ -52,7 +59,8 @@ export function Toolbar() {
         <button
           className="toolbar-btn"
           onClick={() => window.print()}
-          title="Print rendered markdown (⌘P)"
+          aria-label="Print document"
+          title={`Print rendered markdown (${mod}P)`}
         >
           🖨
         </button>
@@ -60,7 +68,8 @@ export function Toolbar() {
       <button
         className="toolbar-btn"
         onClick={toggleTheme}
-        title="Toggle theme (⌘D)"
+        aria-label={`Switch theme, currently ${themeLabel}`}
+        title={`Toggle theme (${mod}D)`}
       >
         {theme === "dark" ? "🌙" : theme === "light" ? "☀️" : "💻"}{" "}
         {themeLabel}
