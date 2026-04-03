@@ -8,6 +8,14 @@ let pendingFilePath: string | null = null;
 // Track allowed project roots for IPC path validation
 const allowedRoots = new Set<string>();
 
+function addAllowedRoot(dirPath: string): void {
+  try {
+    allowedRoots.add(fs.realpathSync(dirPath));
+  } catch {
+    allowedRoots.add(path.resolve(dirPath));
+  }
+}
+
 function isPathAllowed(targetPath: string): boolean {
   let resolved: string;
   try {
@@ -132,7 +140,7 @@ ipcMain.handle("open-folder", async () => {
   });
   if (result.canceled || result.filePaths.length === 0) return null;
   const dirPath = result.filePaths[0];
-  allowedRoots.add(dirPath);
+  addAllowedRoot(dirPath);
   const tree = scanDirectory(dirPath);
   return { rootPath: dirPath, tree };
 });
@@ -193,7 +201,7 @@ function getInitialPath(): string | null {
 app.on("open-file", (_event, filePath) => {
   if (mainWindow) {
     // Add parent directory to allowed roots so scan-directory works
-    allowedRoots.add(path.dirname(filePath));
+    addAllowedRoot(path.dirname(filePath));
     mainWindow.webContents.send("file-opened", filePath);
   } else {
     pendingFilePath = filePath;
@@ -207,11 +215,10 @@ function sendInitialPath(targetPath: string): void {
     const dirPath = stat.isDirectory()
       ? targetPath
       : path.dirname(targetPath);
-    allowedRoots.add(dirPath);
+    addAllowedRoot(dirPath);
     if (stat.isDirectory()) {
       mainWindow.webContents.send("open-directory", targetPath);
     } else {
-      allowedRoots.add(path.dirname(targetPath));
       mainWindow.webContents.send("file-opened", targetPath);
     }
   } catch {
