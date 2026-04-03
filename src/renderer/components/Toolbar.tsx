@@ -3,6 +3,15 @@ import { useAppStore } from "../store";
 const isMac = navigator.platform.includes("Mac");
 const mod = isMac ? "⌘" : "Ctrl+";
 
+function SidebarIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <rect x="1" y="2" width="14" height="12" rx="2" />
+      <line x1="5.5" y1="2" x2="5.5" y2="14" />
+    </svg>
+  );
+}
+
 export function Toolbar() {
   const {
     fontSize,
@@ -26,7 +35,7 @@ export function Toolbar() {
         aria-label="Toggle sidebar"
         title={`Toggle sidebar (${mod}B)`}
       >
-        ☰
+        <SidebarIcon />
       </button>
       <div className="toolbar-spacer" />
       <div className="toolbar-group" role="group" aria-label="Font size">
