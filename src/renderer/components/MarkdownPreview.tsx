@@ -93,7 +93,9 @@ renderer.image = function (token: any) {
     const cleanSrc = src.replace(/^\.\//, "");
     const absolutePath = (currentFileDir + "/" + cleanSrc).replace(/\\/g, "/");
     const urlPath = absolutePath.startsWith("/") ? absolutePath : "/" + absolutePath;
-    resolvedSrc = "local-img://" + urlPath;
+    // Encode path segments to handle # % and other URL-significant characters
+    const encoded = urlPath.split("/").map((s) => encodeURIComponent(s)).join("/");
+    resolvedSrc = "local-img://" + encoded;
   }
 
   const titleAttr = title ? ` title="${title}"` : "";
