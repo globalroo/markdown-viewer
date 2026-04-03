@@ -80,29 +80,33 @@ renderer.list = function (token: any) {
 
 marked.use({ renderer });
 
-function resolveImagePaths(html: string, fileDir: string): string {
-  // Rewrite relative image src to absolute file:// URLs
-  return html.replace(
-    /(<img\s[^>]*src=")([^"]+)(")/gi,
-    (_match, prefix, src, suffix) => {
-      if (src.startsWith("http://") || src.startsWith("https://") || src.startsWith("file://") || src.startsWith("data:")) {
-        return prefix + src + suffix;
-      }
-      // Resolve relative path against the markdown file's directory
-      const absolute = fileDir + "/" + src;
-      return prefix + "file://" + absolute + suffix;
-    }
-  );
-}
-
-function renderMarkdown(content: string, filePath: string): string {
+function renderMarkdown(content: string): string {
   const raw = marked.parse(content) as string;
-  const fileDir = filePath.replace(/[/\\][^/\\]+$/, "");
-  const withImages = resolveImagePaths(raw, fileDir);
-  return DOMPurify.sanitize(withImages, {
+  return DOMPurify.sanitize(raw, {
     ADD_TAGS: ["input"],
     ADD_ATTR: ["checked", "disabled", "type"],
+    ADD_URI_SAFE_ATTR: ["src"],
+    ALLOWED_URI_REGEXP: /^(?:(?:https?|file|data|mailto):|[^a-z]|[a-z+.-]+(?:[^a-z+.\-:]|$))/i,
   });
+}
+
+async function resolveImages(container: HTMLElement, filePath: string): Promise<void> {
+  const images = container.querySelectorAll("img");
+  const promises: Promise<void>[] = [];
+  for (const img of images) {
+    const src = img.getAttribute("src");
+    if (!src) continue;
+    if (src.startsWith("http://") || src.startsWith("https://") || src.startsWith("data:")) continue;
+    // Route through guarded IPC — main process validates against allowedRoots
+    promises.push(
+      window.api.resolveImage(filePath, src).then((resolved) => {
+        img.src = resolved;
+      }).catch(() => {
+        // Access denied or file not found — leave as-is
+      })
+    );
+  }
+  await Promise.all(promises);
 }
 
 const isMac = navigator.platform.includes("Mac");
@@ -115,6 +119,7 @@ export function MarkdownPreview() {
   const setMarkdownContent = useAppStore((s) => s.setMarkdownContent);
   const fontSize = useAppStore((s) => s.fontSize);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!selectedFile) return;
@@ -123,7 +128,6 @@ export function MarkdownPreview() {
     window.api.readFile(selectedFile).then((content) => {
       if (!cancelled) {
         setMarkdownContent(content);
-        // Scroll to top when switching files
         scrollRef.current?.scrollTo(0, 0);
       }
     });
@@ -134,9 +138,16 @@ export function MarkdownPreview() {
   }, [selectedFile, setMarkdownContent]);
 
   const html = useMemo(() => {
-    if (!markdownContent || !selectedFile) return "";
-    return renderMarkdown(markdownContent, selectedFile);
-  }, [markdownContent, selectedFile]);
+    if (!markdownContent) return "";
+    return renderMarkdown(markdownContent);
+  }, [markdownContent]);
+
+  // Resolve relative image paths via guarded IPC after HTML injection
+  useEffect(() => {
+    if (contentRef.current && selectedFile && html) {
+      resolveImages(contentRef.current, selectedFile);
+    }
+  }, [html, selectedFile]);
 
   if (!selectedFile) {
     return (
@@ -180,6 +191,7 @@ export function MarkdownPreview() {
         style={{ fontSize: `${fontSize}px` }}
       >
         <div
+          ref={contentRef}
           className="preview-content"
           dangerouslySetInnerHTML={{ __html: html }}
         />
