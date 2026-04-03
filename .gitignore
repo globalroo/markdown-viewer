@@ -1,0 +1,12 @@
+node_modules/
+dist/
+release/
+.vite/
+*.log
+.DS_Store
+Thumbs.db
+
+# AI orchestration
+.gestalt/
+.codex/
+.gemini/
