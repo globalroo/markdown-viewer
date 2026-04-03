@@ -80,9 +80,26 @@ renderer.list = function (token: any) {
 
 marked.use({ renderer });
 
-function renderMarkdown(content: string): string {
+function resolveImagePaths(html: string, fileDir: string): string {
+  // Rewrite relative image src to absolute file:// URLs
+  return html.replace(
+    /(<img\s[^>]*src=")([^"]+)(")/gi,
+    (_match, prefix, src, suffix) => {
+      if (src.startsWith("http://") || src.startsWith("https://") || src.startsWith("file://") || src.startsWith("data:")) {
+        return prefix + src + suffix;
+      }
+      // Resolve relative path against the markdown file's directory
+      const absolute = fileDir + "/" + src;
+      return prefix + "file://" + absolute + suffix;
+    }
+  );
+}
+
+function renderMarkdown(content: string, filePath: string): string {
   const raw = marked.parse(content) as string;
-  return DOMPurify.sanitize(raw, {
+  const fileDir = filePath.replace(/[/\\][^/\\]+$/, "");
+  const withImages = resolveImagePaths(raw, fileDir);
+  return DOMPurify.sanitize(withImages, {
     ADD_TAGS: ["input"],
     ADD_ATTR: ["checked", "disabled", "type"],
   });
@@ -117,9 +134,9 @@ export function MarkdownPreview() {
   }, [selectedFile, setMarkdownContent]);
 
   const html = useMemo(() => {
-    if (!markdownContent) return "";
-    return renderMarkdown(markdownContent);
-  }, [markdownContent]);
+    if (!markdownContent || !selectedFile) return "";
+    return renderMarkdown(markdownContent, selectedFile);
+  }, [markdownContent, selectedFile]);
 
   if (!selectedFile) {
     return (
