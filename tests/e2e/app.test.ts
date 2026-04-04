@@ -24,6 +24,9 @@ test.beforeAll(() => {
   fs.mkdirSync(path.join(testDir, "docs"));
   fs.writeFileSync(guidePath(), "# Guide\n\nSome guide content.");
   fs.writeFileSync(notesPath(), "# Notes\n\nSome notes.");
+  // Long file for scroll tests
+  const longContent = "# Long Document\n\n" + Array.from({ length: 100 }, (_, i) => `## Section ${i + 1}\n\nParagraph ${i + 1} with enough text to take up space in the viewport.\n`).join("\n");
+  fs.writeFileSync(path.join(testDir, "long.md"), longContent);
 });
 
 test.afterAll(() => {
@@ -639,4 +642,55 @@ test("progress bar is hidden in edit mode", async () => {
 
   // Progress bar should not be visible in edit mode
   await expect(page.locator(".progress-bar-track")).toBeHidden();
+});
+
+// ---------------------------------------------------------------------------
+// 26. Progress bar re-derives after edit mode toggle
+// ---------------------------------------------------------------------------
+
+test("progress bar updates after scrolling a long document", async () => {
+  await openTestFolder();
+  await selectFileByName("long.md");
+
+  // Initially at top — progress should be 0
+  const initialTransform = await page.locator(".progress-bar-fill").evaluate((el) =>
+    getComputedStyle(el).transform
+  );
+
+  // Scroll to the bottom
+  await page.locator(".preview-scroll").evaluate((el) => {
+    el.scrollTop = el.scrollHeight;
+  });
+  await page.waitForTimeout(100);
+
+  // Progress should now be non-zero
+  const scrolledTransform = await page.locator(".progress-bar-fill").evaluate((el) =>
+    getComputedStyle(el).transform
+  );
+
+  expect(scrolledTransform).not.toBe(initialTransform);
+});
+
+test("progress bar is not stuck at zero after edit mode round-trip", async () => {
+  await openTestFolder();
+  await selectFileByName("long.md");
+
+  // Enter edit mode and return
+  await page.click('.preview-mode-btn:text-is("Edit")');
+  await expect(page.locator(".edit-textarea")).toBeVisible();
+  await page.click('.preview-mode-btn:text-is("Preview")');
+  await expect(page.locator(".preview-content")).toBeVisible();
+
+  // Scroll to bottom after returning to preview
+  await page.locator(".preview-scroll").evaluate((el) => {
+    el.scrollTop = el.scrollHeight;
+  });
+  await page.waitForTimeout(100);
+
+  // Progress bar should respond to scroll (not stuck at 0)
+  const transform = await page.locator(".progress-bar-fill").evaluate((el) =>
+    getComputedStyle(el).transform
+  );
+
+  expect(transform).not.toBe("matrix(0, 0, 0, 1, 0, 0)");
 });
