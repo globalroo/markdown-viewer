@@ -1,14 +1,68 @@
 import { useAppStore } from "../store";
 import { FileTree } from "./FileTree";
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { ChevronIcon, ProjectIcon, AddFolderIcon } from "./Icons";
+
+const DRAG_MIME = "application/x-viewmd-path";
 
 function ProjectSection({ project }: { project: { id: string; rootPath: string; name: string; tree: TreeNode[]; isExpanded: boolean } }) {
   const { toggleProject, removeProject, searchQuery } = useAppStore();
+  const [isDragOver, setIsDragOver] = useState(false);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    if (!e.dataTransfer.types.includes(DRAG_MIME)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    setIsDragOver(true);
+  }, []);
+
+  const handleDragLeave = useCallback(() => {
+    setIsDragOver(false);
+  }, []);
+
+  const handleDrop = useCallback(async (e: React.DragEvent) => {
+    setIsDragOver(false);
+    const raw = e.dataTransfer.getData(DRAG_MIME);
+    if (!raw) return;
+    e.preventDefault();
+
+    try {
+      const { path: sourcePath, projectRootPath: sourceRoot } = JSON.parse(raw);
+
+      // Guard: no drop on own parent
+      const sourceDir = sourcePath.replace(/[/\\][^/\\]+$/, "");
+      if (sourceDir === project.rootPath) return;
+
+      const { newPath } = await window.api.moveFile(sourcePath, project.rootPath);
+
+      const state = useAppStore.getState();
+
+      // Re-scan source project
+      const sourceProject = state.projects.find((p) => p.rootPath === sourceRoot);
+      if (sourceProject) {
+        const newTree = await window.api.scanDirectory(sourceRoot);
+        state.updateProjectTree(sourceProject.id, newTree, sourcePath, newPath);
+      }
+
+      // Re-scan destination project if different
+      if (sourceRoot !== project.rootPath) {
+        const newTree = await window.api.scanDirectory(project.rootPath);
+        state.updateProjectTree(project.id, newTree);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Move failed";
+      alert(msg);
+    }
+  }, [project.rootPath, project.id]);
 
   return (
     <div className="project-section">
-      <div className="project-header">
+      <div
+        className={`project-header ${isDragOver ? "drag-over" : ""}`}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
         <button
           className="project-toggle"
           onClick={() => toggleProject(project.id)}
@@ -36,7 +90,7 @@ function ProjectSection({ project }: { project: { id: string; rootPath: string; 
       </div>
       {project.isExpanded && (
         <div className="project-tree">
-          <FileTree tree={project.tree} searchQuery={searchQuery} />
+          <FileTree tree={project.tree} searchQuery={searchQuery} projectRootPath={project.rootPath} />
         </div>
       )}
     </div>

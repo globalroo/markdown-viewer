@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useCallback, useState } from "react";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
 import { RevealIcon } from "./Icons";
@@ -124,33 +124,147 @@ const isMac = navigator.platform.includes("Mac");
 const mod = isMac ? "⌘" : "Ctrl+";
 const revealLabel = isMac ? "Reveal in Finder" : "Show in Explorer";
 
+/** Returns true if it's safe to proceed, false if the draft is still unsaved. */
+async function saveOrDiscardDirty(filePath: string, content: string): Promise<boolean> {
+  const shouldSave = window.confirm("You have unsaved changes. Save before continuing?");
+  if (shouldSave) {
+    try {
+      await window.api.writeFile(filePath, content);
+      useAppStore.getState().setEditDirty(false);
+      return true;
+    } catch {
+      // Save failed — keep dirty state so the user doesn't lose their draft
+      return false;
+    }
+  } else {
+    // User chose to discard
+    useAppStore.getState().setEditDirty(false);
+    return true;
+  }
+}
+
 export function MarkdownPreview() {
   const selectedFile = useAppStore((s) => s.selectedFile);
   const markdownContent = useAppStore((s) => s.markdownContent);
   const setMarkdownContent = useAppStore((s) => s.setMarkdownContent);
   const fontSize = useAppStore((s) => s.fontSize);
+  const editMode = useAppStore((s) => s.editMode);
+  const editContent = useAppStore((s) => s.editContent);
+  const editDirty = useAppStore((s) => s.editDirty);
+  const setEditMode = useAppStore((s) => s.setEditMode);
+  const setEditContent = useAppStore((s) => s.setEditContent);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [copyFeedback, setCopyFeedback] = useState(false);
 
+  // Load file content on selection change, with dirty guard
   useEffect(() => {
     if (!selectedFile) return;
 
     let cancelled = false;
-    window.api.readFile(selectedFile).then((content) => {
+
+    (async () => {
+      const state = useAppStore.getState();
+
+      // If there's a dirty draft for a DIFFERENT file, prompt save/discard
+      if (state.editDirty && state.editFilePath && state.editFilePath !== selectedFile) {
+        const canProceed = await saveOrDiscardDirty(state.editFilePath, state.editContent);
+        if (!canProceed) {
+          // Save failed — revert selection to the file that owns the draft
+          useAppStore.getState().selectFile(state.editFilePath);
+          return;
+        }
+      }
+      if (cancelled) return;
+
+      // If we have a dirty draft for THIS file (e.g. after rename/move), keep it
+      const freshState = useAppStore.getState();
+      if (freshState.editDirty && freshState.editFilePath === selectedFile) {
+        scrollRef.current?.scrollTo(0, 0);
+        return;
+      }
+
+      const content = await window.api.readFile(selectedFile);
       if (!cancelled) {
         setMarkdownContent(content);
+        // Always sync editContent to the new file's content
+        const s = useAppStore.getState();
+        if (s.editMode) {
+          s.setEditContent(content);
+          s.setEditDirty(false);
+        }
         scrollRef.current?.scrollTo(0, 0);
       }
-    });
+    })();
 
     return () => {
       cancelled = true;
     };
   }, [selectedFile, setMarkdownContent]);
 
+  // Window close dirty guard
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (useAppStore.getState().editDirty) {
+        e.preventDefault();
+        e.returnValue = false;
+      }
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, []);
+
+  // Render draft content when dirty, otherwise saved content
+  const previewSource = editDirty ? editContent : markdownContent;
   const html = useMemo(() => {
-    if (!markdownContent || !selectedFile) return "";
-    return renderMarkdown(markdownContent, selectedFile);
-  }, [markdownContent, selectedFile]);
+    if (!previewSource || !selectedFile) return "";
+    return renderMarkdown(previewSource, selectedFile);
+  }, [previewSource, selectedFile]);
+
+  const handleTabKey = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Tab") {
+      e.preventDefault();
+      const ta = e.currentTarget;
+      const start = ta.selectionStart;
+      const end = ta.selectionEnd;
+
+      if (e.shiftKey) {
+        // Outdent: remove up to 2 leading spaces from current line
+        const lineStart = ta.value.lastIndexOf("\n", start - 1) + 1;
+        const lineText = ta.value.slice(lineStart, end);
+        const spacesToRemove = lineText.startsWith("  ") ? 2 : lineText.startsWith(" ") ? 1 : 0;
+        if (spacesToRemove > 0) {
+          const newValue = ta.value.slice(0, lineStart) + ta.value.slice(lineStart + spacesToRemove);
+          setEditContent(newValue);
+          requestAnimationFrame(() => {
+            ta.selectionStart = Math.max(start - spacesToRemove, lineStart);
+            ta.selectionEnd = Math.max(end - spacesToRemove, lineStart);
+          });
+        }
+      } else {
+        // Insert 2 spaces
+        const newValue = ta.value.slice(0, start) + "  " + ta.value.slice(end);
+        setEditContent(newValue);
+        requestAnimationFrame(() => {
+          ta.selectionStart = ta.selectionEnd = start + 2;
+        });
+      }
+    }
+  }, [setEditContent]);
+
+  const handleCopy = useCallback(async () => {
+    const content = editDirty ? editContent : markdownContent;
+    await navigator.clipboard.writeText(content);
+    setCopyFeedback(true);
+    setTimeout(() => setCopyFeedback(false), 1500);
+  }, [editDirty, editContent, markdownContent]);
+
+  const handleSave = useCallback(async () => {
+    if (!selectedFile || !editDirty) return;
+    await window.api.writeFile(selectedFile, editContent);
+    useAppStore.getState().setEditDirty(false);
+    useAppStore.getState().setMarkdownContent(editContent);
+  }, [selectedFile, editDirty, editContent]);
 
   if (!selectedFile) {
     return (
@@ -178,25 +292,71 @@ export function MarkdownPreview() {
       <div className="preview-header">
         <span className="preview-filename" title={selectedFile}>
           {fileName}
+          {editDirty && <span className="dirty-indicator" title="Unsaved changes"> ●</span>}
         </span>
-        <button
-          className="preview-reveal-btn"
-          onClick={() => window.api.showInFolder(selectedFile)}
-          aria-label={revealLabel}
-          title={revealLabel}
-        >
-          <RevealIcon />
-        </button>
+        <div className="preview-header-actions">
+          <div className="preview-mode-toggle">
+            <button
+              className={`preview-mode-btn ${!editMode ? "active" : ""}`}
+              onClick={() => setEditMode(false)}
+              title={`Preview (${mod}E)`}
+            >
+              Preview
+            </button>
+            <button
+              className={`preview-mode-btn ${editMode ? "active" : ""}`}
+              onClick={() => setEditMode(true)}
+              title={`Edit (${mod}E)`}
+            >
+              Edit
+            </button>
+          </div>
+          {editMode && editDirty && (
+            <button
+              className="preview-save-btn"
+              onClick={handleSave}
+              title={`Save (${mod}S)`}
+            >
+              Save
+            </button>
+          )}
+          <button
+            className="preview-copy-btn"
+            onClick={handleCopy}
+            title="Copy raw markdown"
+          >
+            {copyFeedback ? "Copied!" : "Copy"}
+          </button>
+          <button
+            className="preview-reveal-btn"
+            onClick={() => window.api.showInFolder(selectedFile)}
+            aria-label={revealLabel}
+            title={revealLabel}
+          >
+            <RevealIcon />
+          </button>
+        </div>
       </div>
       <div
         className="preview-scroll"
         ref={scrollRef}
         style={{ fontSize: `${fontSize}px` }}
       >
-        <div
-          className="preview-content"
-          dangerouslySetInnerHTML={{ __html: html }}
-        />
+        {editMode ? (
+          <textarea
+            ref={textareaRef}
+            className="edit-textarea"
+            value={editContent}
+            onChange={(e) => setEditContent(e.target.value)}
+            onKeyDown={handleTabKey}
+            spellCheck={false}
+          />
+        ) : (
+          <div
+            className="preview-content"
+            dangerouslySetInnerHTML={{ __html: html }}
+          />
+        )}
       </div>
     </div>
   );

@@ -15,6 +15,10 @@ interface ElectronAPI {
   scanDirectory: (dirPath: string) => Promise<TreeNode[]>;
   readFile: (filePath: string) => Promise<string>;
   showInFolder: (filePath: string) => Promise<void>;
+  renameFile: (oldPath: string, newName: string) => Promise<{ newPath: string }>;
+  moveFile: (sourcePath: string, destDir: string) => Promise<{ newPath: string }>;
+  writeFile: (filePath: string, content: string) => Promise<void>;
+  removeRoot: (rootPath: string) => Promise<void>;
   onFileOpened: (callback: (filePath: string) => void) => () => void;
   onDirectoryOpened: (callback: (dirPath: string) => void) => () => void;
 }

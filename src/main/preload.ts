@@ -25,6 +25,18 @@ const api = {
   showInFolder: (filePath: string): Promise<void> =>
     ipcRenderer.invoke("show-in-folder", filePath),
 
+  renameFile: (oldPath: string, newName: string): Promise<{ newPath: string }> =>
+    ipcRenderer.invoke("rename-file", oldPath, newName),
+
+  moveFile: (sourcePath: string, destDir: string): Promise<{ newPath: string }> =>
+    ipcRenderer.invoke("move-file", sourcePath, destDir),
+
+  writeFile: (filePath: string, content: string): Promise<void> =>
+    ipcRenderer.invoke("write-file", filePath, content),
+
+  removeRoot: (rootPath: string): Promise<void> =>
+    ipcRenderer.invoke("remove-root", rootPath),
+
   onFileOpened: (callback: (filePath: string) => void) => {
     const handler = (_event: Electron.IpcRendererEvent, filePath: string) =>
       callback(filePath);

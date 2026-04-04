@@ -23,8 +23,31 @@ function useKeyboardShortcuts() {
       const mod = e.metaKey || e.ctrlKey;
       if (!mod) return;
 
+      const state = useAppStore.getState();
+
       // Don't fire shortcuts when settings modal is open
-      if (useAppStore.getState().settingsOpen && e.key !== ",") return;
+      if (state.settingsOpen && e.key !== ",") return;
+
+      // When editing, only allow save (s) and edit toggle (e)
+      const isEditing = (e.target as HTMLElement)?.tagName === "TEXTAREA";
+      if (isEditing) {
+        if (e.key === "s") {
+          e.preventDefault();
+          if (state.editDirty && state.selectedFile) {
+            window.api.writeFile(state.selectedFile, state.editContent).then(() => {
+              useAppStore.getState().setEditDirty(false);
+              useAppStore.getState().setMarkdownContent(state.editContent);
+            });
+          }
+          return;
+        }
+        if (e.key === "e") {
+          e.preventDefault();
+          state.setEditMode(!state.editMode);
+          return;
+        }
+        return; // suppress all other shortcuts while editing
+      }
 
       switch (e.key) {
         case "=":
@@ -71,6 +94,21 @@ function useKeyboardShortcuts() {
           const searchInput =
             document.querySelector<HTMLInputElement>(".search-input");
           searchInput?.focus();
+          break;
+        case "e":
+          if (state.selectedFile) {
+            e.preventDefault();
+            state.setEditMode(!state.editMode);
+          }
+          break;
+        case "s":
+          if (state.editMode && state.editDirty && state.selectedFile) {
+            e.preventDefault();
+            window.api.writeFile(state.selectedFile, state.editContent).then(() => {
+              useAppStore.getState().setEditDirty(false);
+              useAppStore.getState().setMarkdownContent(state.editContent);
+            });
+          }
           break;
       }
     };

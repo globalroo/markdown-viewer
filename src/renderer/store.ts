@@ -82,6 +82,15 @@ interface AppState {
   sidebarVisible: boolean;
   settingsOpen: boolean;
 
+  // Edit mode state
+  editMode: boolean;
+  editContent: string;
+  editDirty: boolean;
+  editFilePath: string | null; // the file this draft belongs to
+
+  // Rename state
+  renamingPath: string | null;
+
   addProject: (rootPath: string, tree: TreeNode[]) => void;
   removeProject: (id: string) => void;
   toggleProject: (id: string) => void;
@@ -97,6 +106,17 @@ interface AppState {
   setFont: (font: FontId) => void;
   toggleSidebar: () => void;
   toggleSettings: () => void;
+
+  // Edit mode actions
+  setEditMode: (mode: boolean) => void;
+  setEditContent: (content: string) => void;
+  setEditDirty: (dirty: boolean) => void;
+
+  // Rename action
+  setRenamingPath: (path: string | null) => void;
+
+  // Tree mutation after rename/move
+  updateProjectTree: (projectId: string, tree: TreeNode[], oldPath?: string, newPath?: string) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -110,6 +130,11 @@ export const useAppStore = create<AppState>((set) => ({
   font: "system",
   sidebarVisible: true,
   settingsOpen: false,
+  editMode: false,
+  editContent: "",
+  editDirty: false,
+  editFilePath: null,
+  renamingPath: null,
 
   addProject: (rootPath, tree) =>
     set((state) => {
@@ -127,6 +152,10 @@ export const useAppStore = create<AppState>((set) => ({
 
   removeProject: (id) =>
     set((state) => {
+      const removed = state.projects.find((p) => p.id === id);
+      if (removed) {
+        window.api.removeRoot(removed.rootPath);
+      }
       const projects = state.projects.filter((p) => p.id !== id);
       const selectedFile =
         state.selectedFile && state.selectedFile.startsWith(id)
@@ -188,4 +217,78 @@ export const useAppStore = create<AppState>((set) => ({
 
   toggleSettings: () =>
     set((state) => ({ settingsOpen: !state.settingsOpen })),
+
+  setEditMode: (mode) =>
+    set((state) => {
+      if (mode) {
+        // Preserve draft if dirty AND belongs to the current file
+        if (state.editDirty && state.editFilePath === state.selectedFile) {
+          return { editMode: true };
+        }
+        return {
+          editMode: true,
+          editContent: state.markdownContent,
+          editDirty: false,
+          editFilePath: state.selectedFile,
+        };
+      }
+      return { editMode: false };
+    }),
+
+  setEditContent: (content) =>
+    set((state) => ({
+      editContent: content,
+      editDirty: content !== state.markdownContent,
+      editFilePath: state.selectedFile,
+    })),
+
+  setEditDirty: (dirty) => set({ editDirty: dirty }),
+
+  setRenamingPath: (path) => set({ renamingPath: path }),
+
+  updateProjectTree: (projectId, tree, oldPath, newPath) =>
+    set((state) => {
+      const projects = state.projects.map((p) =>
+        p.id === projectId ? { ...p, tree } : p
+      );
+
+      let selectedFile = state.selectedFile;
+      let expandedDirs = state.expandedDirs;
+
+      const hasPrefix = (p: string, base: string) =>
+        p.startsWith(base + "/") || p.startsWith(base + "\\");
+
+      // Update paths if a rename/move changed them
+      if (oldPath && newPath) {
+        if (selectedFile === oldPath) {
+          selectedFile = newPath;
+        } else if (selectedFile && hasPrefix(selectedFile, oldPath)) {
+          selectedFile = newPath + selectedFile.slice(oldPath.length);
+        }
+
+        const nextDirs = new Set<string>();
+        for (const dir of expandedDirs) {
+          if (dir === oldPath) {
+            nextDirs.add(newPath);
+          } else if (hasPrefix(dir, oldPath)) {
+            nextDirs.add(newPath + dir.slice(oldPath.length));
+          } else {
+            nextDirs.add(dir);
+          }
+        }
+        expandedDirs = nextDirs;
+      }
+
+      // Also rewrite editFilePath if it matches the old path
+      let editFilePath = state.editFilePath;
+      if (oldPath && newPath && editFilePath) {
+        if (editFilePath === oldPath) {
+          editFilePath = newPath;
+        } else if (hasPrefix(editFilePath, oldPath)) {
+          editFilePath = newPath + editFilePath.slice(oldPath.length);
+        }
+      }
+
+      return { projects, selectedFile, expandedDirs, editFilePath };
+    }),
 }));

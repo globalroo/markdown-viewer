@@ -144,6 +144,28 @@ function readFileContent(filePath: string): string {
   return fs.readFileSync(filePath, "utf-8");
 }
 
+// Validation helpers for mutating operations
+const MARKDOWN_EXTENSIONS = /\.(md|markdown|mdown|mkd|mkdn)$/i;
+const RESERVED_WINDOWS_NAMES = /^(CON|PRN|AUX|NUL|COM[0-9]|LPT[0-9])(\.|$)/i;
+
+function validateFileName(name: string): void {
+  if (!name || !name.trim()) throw new Error("Filename cannot be empty");
+  if (/[/\\]/.test(name)) throw new Error("Filename cannot contain path separators");
+  if (name.includes("..")) throw new Error("Invalid filename");
+  if (name.startsWith(".")) throw new Error("Filename cannot start with a dot");
+  if (/[.\s]$/.test(name)) throw new Error("Filename cannot end with a dot or space");
+  if (RESERVED_WINDOWS_NAMES.test(name)) throw new Error("Reserved filename");
+  if (!MARKDOWN_EXTENSIONS.test(name)) throw new Error("File must have a markdown extension (.md, .markdown, etc.)");
+}
+
+function removeAllowedRoot(dirPath: string): void {
+  try {
+    allowedRoots.delete(fs.realpathSync(dirPath));
+  } catch {
+    allowedRoots.delete(path.resolve(dirPath));
+  }
+}
+
 // IPC handlers
 ipcMain.handle("open-folder", async () => {
   const result = await dialog.showOpenDialog({
@@ -175,6 +197,86 @@ ipcMain.handle(
 ipcMain.handle("show-in-folder", async (_event, filePath: string) => {
   if (!isPathAllowed(filePath)) throw new Error("Access denied");
   shell.showItemInFolder(filePath);
+});
+
+ipcMain.handle(
+  "rename-file",
+  async (_event, oldPath: string, newName: string): Promise<{ newPath: string }> => {
+    if (!isPathAllowed(oldPath)) throw new Error("Access denied");
+    if (!MARKDOWN_EXTENSIONS.test(oldPath)) throw new Error("Can only rename markdown files");
+    validateFileName(newName);
+
+    const dir = path.dirname(oldPath);
+    const newPath = path.join(dir, newName);
+
+    // Allow case-only renames on case-insensitive filesystems
+    if (fs.existsSync(newPath)) {
+      try {
+        const srcStat = fs.statSync(oldPath);
+        const dstStat = fs.statSync(newPath);
+        if (srcStat.ino !== dstStat.ino) {
+          throw new Error("A file with that name already exists");
+        }
+      } catch (e: unknown) {
+        if (e instanceof Error && e.message === "A file with that name already exists") throw e;
+        // If stat fails, fall through to the rename attempt
+      }
+    }
+
+    fs.renameSync(oldPath, newPath);
+    return { newPath };
+  }
+);
+
+ipcMain.handle(
+  "move-file",
+  async (_event, sourcePath: string, destDir: string): Promise<{ newPath: string }> => {
+    if (!isPathAllowed(sourcePath)) throw new Error("Access denied: source");
+    if (!isPathAllowed(destDir)) throw new Error("Access denied: destination");
+    if (!MARKDOWN_EXTENSIONS.test(sourcePath)) throw new Error("Can only move markdown files");
+
+    const fileName = path.basename(sourcePath);
+    const newPath = path.join(destDir, fileName);
+
+    if (path.dirname(sourcePath) === path.resolve(destDir)) {
+      throw new Error("File is already in this directory");
+    }
+
+    if (fs.existsSync(newPath)) {
+      throw new Error("A file with that name already exists in the destination");
+    }
+
+    try {
+      fs.renameSync(sourcePath, newPath);
+    } catch (err: unknown) {
+      // EXDEV: cross-device move — atomic copy+delete fallback
+      if (err && typeof err === "object" && "code" in err && err.code === "EXDEV") {
+        const tmpPath = newPath + ".tmp";
+        fs.copyFileSync(sourcePath, tmpPath);
+        fs.renameSync(tmpPath, newPath);
+        fs.unlinkSync(sourcePath);
+      } else {
+        throw err;
+      }
+    }
+
+    return { newPath };
+  }
+);
+
+ipcMain.handle(
+  "write-file",
+  async (_event, filePath: string, content: string): Promise<void> => {
+    if (!isPathAllowed(filePath)) throw new Error("Access denied");
+    if (!MARKDOWN_EXTENSIONS.test(filePath)) {
+      throw new Error("Can only write markdown files");
+    }
+    fs.writeFileSync(filePath, content, "utf-8");
+  }
+);
+
+ipcMain.handle("remove-root", async (_event, rootPath: string) => {
+  removeAllowedRoot(rootPath);
 });
 
 // Handle CLI arguments — accept a directory or file path
