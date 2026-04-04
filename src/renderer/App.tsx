@@ -23,6 +23,9 @@ function useKeyboardShortcuts() {
       const mod = e.metaKey || e.ctrlKey;
       if (!mod) return;
 
+      // Don't fire shortcuts when settings modal is open
+      if (useAppStore.getState().settingsOpen && e.key !== ",") return;
+
       switch (e.key) {
         case "=":
         case "+":
