@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { useAppStore } from "../../src/renderer/store";
+import { useAppStore, THEMES } from "../../src/renderer/store";
 
 const initialState = useAppStore.getState();
 
@@ -19,6 +19,10 @@ function resetStore() {
     fontSize: 16,
     sidebarVisible: true,
     settingsOpen: false,
+    contentWidth: "standard",
+    lineHeight: "optimal",
+    focusMode: false,
+    warmFilter: false,
   });
   vi.clearAllMocks();
 }
@@ -564,6 +568,141 @@ describe("useAppStore", () => {
       useAppStore.getState().setRenamingPath(null);
 
       expect(useAppStore.getState().renamingPath).toBeNull();
+    });
+  });
+
+  // ---------------------------------------------------------------
+  // contentWidth
+  // ---------------------------------------------------------------
+  describe("contentWidth", () => {
+    it("defaults to 'standard'", () => {
+      expect(useAppStore.getState().contentWidth).toBe("standard");
+    });
+
+    it("setContentWidth changes the value", () => {
+      useAppStore.getState().setContentWidth("wide");
+
+      expect(useAppStore.getState().contentWidth).toBe("wide");
+    });
+
+    it("accepts 'narrow'", () => {
+      useAppStore.getState().setContentWidth("narrow");
+
+      expect(useAppStore.getState().contentWidth).toBe("narrow");
+    });
+
+    it("accepts 'standard'", () => {
+      useAppStore.getState().setContentWidth("wide");
+      useAppStore.getState().setContentWidth("standard");
+
+      expect(useAppStore.getState().contentWidth).toBe("standard");
+    });
+
+    it("accepts 'wide'", () => {
+      useAppStore.getState().setContentWidth("wide");
+
+      expect(useAppStore.getState().contentWidth).toBe("wide");
+    });
+  });
+
+  // ---------------------------------------------------------------
+  // lineHeight
+  // ---------------------------------------------------------------
+  describe("lineHeight", () => {
+    it("defaults to 'optimal'", () => {
+      expect(useAppStore.getState().lineHeight).toBe("optimal");
+    });
+
+    it("setLineHeight changes the value", () => {
+      useAppStore.getState().setLineHeight("relaxed");
+
+      expect(useAppStore.getState().lineHeight).toBe("relaxed");
+    });
+
+    it("accepts 'compact'", () => {
+      useAppStore.getState().setLineHeight("compact");
+
+      expect(useAppStore.getState().lineHeight).toBe("compact");
+    });
+
+    it("accepts 'optimal'", () => {
+      useAppStore.getState().setLineHeight("compact");
+      useAppStore.getState().setLineHeight("optimal");
+
+      expect(useAppStore.getState().lineHeight).toBe("optimal");
+    });
+
+    it("accepts 'relaxed'", () => {
+      useAppStore.getState().setLineHeight("relaxed");
+
+      expect(useAppStore.getState().lineHeight).toBe("relaxed");
+    });
+  });
+
+  // ---------------------------------------------------------------
+  // focusMode
+  // ---------------------------------------------------------------
+  describe("focusMode", () => {
+    it("defaults to false", () => {
+      expect(useAppStore.getState().focusMode).toBe(false);
+    });
+
+    it("toggleFocusMode toggles to true", () => {
+      useAppStore.getState().toggleFocusMode();
+
+      expect(useAppStore.getState().focusMode).toBe(true);
+    });
+
+    it("double toggle returns to false", () => {
+      useAppStore.getState().toggleFocusMode();
+      useAppStore.getState().toggleFocusMode();
+
+      expect(useAppStore.getState().focusMode).toBe(false);
+    });
+  });
+
+  // ---------------------------------------------------------------
+  // warmFilter
+  // ---------------------------------------------------------------
+  describe("warmFilter", () => {
+    it("defaults to false", () => {
+      expect(useAppStore.getState().warmFilter).toBe(false);
+    });
+
+    it("toggleWarmFilter toggles to true", () => {
+      useAppStore.getState().toggleWarmFilter();
+
+      expect(useAppStore.getState().warmFilter).toBe(true);
+    });
+
+    it("double toggle returns to false", () => {
+      useAppStore.getState().toggleWarmFilter();
+      useAppStore.getState().toggleWarmFilter();
+
+      expect(useAppStore.getState().warmFilter).toBe(false);
+    });
+  });
+
+  // ---------------------------------------------------------------
+  // THEMES — reading group
+  // ---------------------------------------------------------------
+  describe("THEMES reading group", () => {
+    it("contains 'sepia' with group 'reading'", () => {
+      const sepia = THEMES.find((t) => t.id === "sepia");
+      expect(sepia).toBeDefined();
+      expect(sepia!.group).toBe("reading");
+    });
+
+    it("contains 'sage' with group 'reading'", () => {
+      const sage = THEMES.find((t) => t.id === "sage");
+      expect(sage).toBeDefined();
+      expect(sage!.group).toBe("reading");
+    });
+
+    it("contains 'twilight-reader' with group 'reading'", () => {
+      const twilight = THEMES.find((t) => t.id === "twilight-reader");
+      expect(twilight).toBeDefined();
+      expect(twilight!.group).toBe("reading");
     });
   });
 });

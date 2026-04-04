@@ -499,3 +499,144 @@ test("shortcuts like Cmd+B are suppressed when editing", async () => {
   // Restore
   await page.keyboard.press(`${modKey()}+b`);
 });
+
+// ---------------------------------------------------------------------------
+// 18. Reading themes available in settings
+// ---------------------------------------------------------------------------
+
+test("reading themes are visible in settings panel", async () => {
+  await page.click('[aria-label="Open settings"]');
+  await expect(page.locator(".settings-panel")).toBeVisible();
+
+  // Scroll the settings body to ensure reading themes are visible
+  const body = page.locator(".settings-body");
+  await body.evaluate((el) => el.scrollTop = 0);
+
+  await expect(page.locator('.swatch-label:text-is("Sepia")')).toBeVisible();
+  await expect(page.locator('.swatch-label:text-is("Sage")')).toBeVisible();
+  await expect(page.locator('.swatch-label:text-is("Twilight Reader")')).toBeVisible();
+});
+
+// ---------------------------------------------------------------------------
+// 19. Theme switching — click Sepia swatch
+// ---------------------------------------------------------------------------
+
+test("clicking Sepia swatch changes data-theme attribute", async () => {
+  await page.click('[aria-label="Open settings"]');
+  await expect(page.locator(".settings-panel")).toBeVisible();
+
+  const sepiaSwatch = page.locator('.theme-swatch', { has: page.locator('.swatch-label:text-is("Sepia")') });
+  await sepiaSwatch.click();
+
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "sepia");
+});
+
+// ---------------------------------------------------------------------------
+// 20. Typography controls visible in settings
+// ---------------------------------------------------------------------------
+
+test("typography controls are visible in settings", async () => {
+  await page.click('[aria-label="Open settings"]');
+  await expect(page.locator(".settings-panel")).toBeVisible();
+
+  // Scroll to bottom of settings to reveal reading layout section
+  const body = page.locator(".settings-body");
+  await body.evaluate((el) => el.scrollTop = el.scrollHeight);
+
+  // Content width buttons
+  await expect(page.locator('.segmented-btn:text-is("Narrow")')).toBeVisible();
+  await expect(page.locator('.segmented-btn:text-is("Standard")')).toBeVisible();
+  await expect(page.locator('.segmented-btn:text-is("Wide")')).toBeVisible();
+
+  // Line height buttons
+  await expect(page.locator('.segmented-btn:text-is("Compact")')).toBeVisible();
+  await expect(page.locator('.segmented-btn:text-is("Optimal")')).toBeVisible();
+  await expect(page.locator('.segmented-btn:text-is("Relaxed")')).toBeVisible();
+});
+
+// ---------------------------------------------------------------------------
+// 21. Line width changes — clicking Narrow
+// ---------------------------------------------------------------------------
+
+test("clicking Narrow changes --content-width CSS variable", async () => {
+  await page.click('[aria-label="Open settings"]');
+  await expect(page.locator(".settings-panel")).toBeVisible();
+
+  const body = page.locator(".settings-body");
+  await body.evaluate((el) => el.scrollTop = el.scrollHeight);
+
+  await page.click('.segmented-btn:text-is("Narrow")');
+
+  const narrowWidth = await page.locator("html").evaluate((el) =>
+    el.style.getPropertyValue("--content-width")
+  );
+
+  expect(narrowWidth).toBe("38rem");
+});
+
+// ---------------------------------------------------------------------------
+// 22. Focus mode toggle — Cmd+Shift+F
+// ---------------------------------------------------------------------------
+
+test("focus mode hides toolbar and sidebar, Escape restores them", async () => {
+  await expect(page.locator(".toolbar")).toBeVisible();
+  await expect(page.locator(".sidebar")).toBeVisible();
+
+  // Enter focus mode
+  await page.keyboard.press(`${modKey()}+Shift+f`);
+
+  await expect(page.locator(".toolbar")).toBeHidden();
+  await expect(page.locator(".sidebar")).toBeHidden();
+
+  // Exit focus mode with Escape
+  await page.keyboard.press("Escape");
+
+  await expect(page.locator(".toolbar")).toBeVisible();
+  await expect(page.locator(".sidebar")).toBeVisible();
+});
+
+// ---------------------------------------------------------------------------
+// 23. Warm filter toggle
+// ---------------------------------------------------------------------------
+
+test("warm filter toggle adds warm-filter class to html", async () => {
+  await page.click('[aria-label="Open settings"]');
+  await expect(page.locator(".settings-panel")).toBeVisible();
+
+  const body = page.locator(".settings-body");
+  await body.evaluate((el) => el.scrollTop = el.scrollHeight);
+
+  await page.click('.toggle-option:has-text("Warm filter")');
+
+  await expect(page.locator("html")).toHaveClass(/warm-filter/);
+});
+
+// ---------------------------------------------------------------------------
+// 24. Progress bar visible when viewing a file
+// ---------------------------------------------------------------------------
+
+test("progress bar is visible when viewing a file", async () => {
+  await openTestFolder();
+  await selectFileByName("README.md");
+
+  await expect(page.locator(".progress-bar-track")).toBeVisible();
+});
+
+// ---------------------------------------------------------------------------
+// 25. Progress bar hidden in edit mode
+// ---------------------------------------------------------------------------
+
+test("progress bar is hidden in edit mode", async () => {
+  await openTestFolder();
+  await selectFileByName("README.md");
+
+  // Verify progress bar is present in preview mode
+  await expect(page.locator(".progress-bar-track")).toBeVisible();
+
+  // Enter edit mode
+  await page.click('.preview-mode-btn:text-is("Edit")');
+  await expect(page.locator(".edit-textarea")).toBeVisible();
+
+  // Progress bar should not be visible in edit mode
+  await expect(page.locator(".progress-bar-track")).toBeHidden();
+});

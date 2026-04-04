@@ -156,6 +156,7 @@ export function MarkdownPreview() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [copyFeedback, setCopyFeedback] = useState(false);
+  const [scrollProgress, setScrollProgress] = useState(0);
 
   // Load file content on selection change, with dirty guard
   useEffect(() => {
@@ -213,6 +214,30 @@ export function MarkdownPreview() {
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
   }, []);
+
+  // Track scroll progress for reading progress bar (preview mode only)
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || editMode) {
+      setScrollProgress(0);
+      return;
+    }
+    const updateProgress = () => {
+      const { scrollTop, scrollHeight, clientHeight } = el;
+      const max = scrollHeight - clientHeight;
+      setScrollProgress(max > 0 ? scrollTop / max : 0);
+    };
+    el.addEventListener("scroll", updateProgress, { passive: true });
+    // Observe the content child for reflows from width/height/font changes
+    const content = el.querySelector(".preview-content");
+    const observer = new ResizeObserver(updateProgress);
+    if (content) observer.observe(content);
+    observer.observe(el);
+    return () => {
+      el.removeEventListener("scroll", updateProgress);
+      observer.disconnect();
+    };
+  }, [selectedFile, editMode]);
 
   // Render draft content when dirty, otherwise saved content
   const previewSource = editDirty ? editContent : markdownContent;
@@ -337,6 +362,14 @@ export function MarkdownPreview() {
           </button>
         </div>
       </div>
+      {!editMode && (
+        <div className="progress-bar-track">
+          <div
+            className="progress-bar-fill"
+            style={{ transform: `scaleX(${scrollProgress})` }}
+          />
+        </div>
+      )}
       <div
         className="preview-scroll"
         ref={scrollRef}

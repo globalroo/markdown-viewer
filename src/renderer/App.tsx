@@ -21,9 +21,16 @@ function useKeyboardShortcuts() {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const mod = e.metaKey || e.ctrlKey;
-      if (!mod) return;
-
       const state = useAppStore.getState();
+
+      // Escape exits focus mode (no mod key needed)
+      if (e.key === "Escape" && state.focusMode) {
+        e.preventDefault();
+        state.toggleFocusMode();
+        return;
+      }
+
+      if (!mod) return;
 
       // Don't fire shortcuts when settings modal is open
       if (state.settingsOpen && e.key !== ",") return;
@@ -90,10 +97,16 @@ function useKeyboardShortcuts() {
           window.print();
           break;
         case "f":
-          e.preventDefault();
-          const searchInput =
-            document.querySelector<HTMLInputElement>(".search-input");
-          searchInput?.focus();
+        case "F":
+          if (e.shiftKey) {
+            e.preventDefault();
+            state.toggleFocusMode();
+          } else {
+            e.preventDefault();
+            const searchInput =
+              document.querySelector<HTMLInputElement>(".search-input");
+            searchInput?.focus();
+          }
           break;
         case "e":
           if (state.selectedFile) {
@@ -150,6 +163,30 @@ function useThemeAndFont() {
   }, [font]);
 }
 
+const WIDTH_MAP = { narrow: "38rem", standard: "44rem", wide: "52rem" };
+const HEIGHT_MAP = { compact: "1.35", optimal: "1.45", relaxed: "1.55" };
+
+function useReadingComfort() {
+  const contentWidth = useAppStore((s) => s.contentWidth);
+  const lineHeight = useAppStore((s) => s.lineHeight);
+  const warmFilter = useAppStore((s) => s.warmFilter);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    root.style.setProperty("--content-width", WIDTH_MAP[contentWidth]);
+    root.style.setProperty("--line-height", HEIGHT_MAP[lineHeight]);
+  }, [contentWidth, lineHeight]);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    if (warmFilter) {
+      root.classList.add("warm-filter");
+    } else {
+      root.classList.remove("warm-filter");
+    }
+  }, [warmFilter]);
+}
+
 function useFileAssociation() {
   useEffect(() => {
     const unsubFile = window.api.onFileOpened(async (filePath) => {
@@ -176,10 +213,13 @@ function useFileAssociation() {
 export function App() {
   useKeyboardShortcuts();
   useThemeAndFont();
+  useReadingComfort();
   useFileAssociation();
 
+  const focusMode = useAppStore((s) => s.focusMode);
+
   return (
-    <div className="app">
+    <div className={`app ${focusMode ? "focus-mode" : ""}`}>
       <Toolbar />
       <div className="app-body">
         <Sidebar />

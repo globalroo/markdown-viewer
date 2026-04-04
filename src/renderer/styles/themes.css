@@ -333,6 +333,87 @@
   --selection: rgba(34, 85, 170, 0.25);
 }
 
+/* ── Sepia: Warm parchment, research-backed reading comfort ── */
+[data-theme="sepia"] {
+  --bg-app: #f5f0e8;
+  --bg-sidebar: #ece5d8;
+  --bg-toolbar: #e3dccf;
+  --bg-hover: #dbd3c4;
+  --bg-selected: #d4c9b6;
+  --bg-input: #faf6f0;
+  --bg-code: #ede7db;
+
+  --text-primary: #3b2e1e;
+  --text-secondary: #5e4830;
+  --text-muted: #6e5c44;
+  --text-link: #8b5e34;
+
+  --border-color: #d9cfbf;
+  --border-focus: #a0774a;
+  --shadow-subtle: 0 1px 2px rgba(60, 40, 10, 0.08);
+
+  --scrollbar-thumb: #c4b49c;
+  --scrollbar-track: transparent;
+
+  --accent: #a0774a;
+  --accent-subtle: rgba(160, 119, 74, 0.12);
+  --selection: rgba(160, 119, 74, 0.25);
+}
+
+/* ── Sage: Light green, reduces visual fatigue (Frontiers in Psychology 2025) ── */
+[data-theme="sage"] {
+  --bg-app: #eaf4e2;
+  --bg-sidebar: #e0ebd8;
+  --bg-toolbar: #d6e3ce;
+  --bg-hover: #ccdbc3;
+  --bg-selected: #b8d4a8;
+  --bg-input: #f2f8ee;
+  --bg-code: #e4ede0;
+
+  --text-primary: #253126;
+  --text-secondary: #3d5040;
+  --text-muted: #4d6350;
+  --text-link: #2e6b3a;
+
+  --border-color: #c4d3bc;
+  --border-focus: #4a8a5a;
+  --shadow-subtle: 0 1px 2px rgba(20, 50, 20, 0.06);
+
+  --scrollbar-thumb: #a8bea0;
+  --scrollbar-track: transparent;
+
+  --accent: #4a8a5a;
+  --accent-subtle: rgba(74, 138, 90, 0.12);
+  --selection: rgba(74, 138, 90, 0.25);
+}
+
+/* ── Twilight Reader: Warm dark, avoids pure black for reading comfort ── */
+[data-theme="twilight-reader"] {
+  --bg-app: #1a1a2e;
+  --bg-sidebar: #20203a;
+  --bg-toolbar: #282846;
+  --bg-hover: #32325a;
+  --bg-selected: #3a3a6e;
+  --bg-input: #1e1e34;
+  --bg-code: #1e1e34;
+
+  --text-primary: #d4d0cc;
+  --text-secondary: #b0aaa2;
+  --text-muted: #9a948c;
+  --text-link: #7eb8da;
+
+  --border-color: #3a3a54;
+  --border-focus: #7eb8da;
+  --shadow-subtle: 0 1px 3px rgba(0, 0, 0, 0.4);
+
+  --scrollbar-thumb: #4a4a6a;
+  --scrollbar-track: transparent;
+
+  --accent: #7eb8da;
+  --accent-subtle: rgba(126, 184, 218, 0.15);
+  --selection: rgba(126, 184, 218, 0.3);
+}
+
 /* ── Sapphire: Tritanopia-safe (red-cyan palette, no blue-yellow confusion) ── */
 [data-theme="sapphire"] {
   --bg-app: #f7f5f5;
@@ -411,7 +492,8 @@
 [data-theme="solstice"] .hljs,
 [data-theme="lagoon"] .hljs,
 [data-theme="dusk"] .hljs,
-[data-theme="stark-dark"] .hljs {
+[data-theme="stark-dark"] .hljs,
+[data-theme="twilight-reader"] .hljs {
   color: #c9d1d9;
   background: var(--bg-code);
 }
@@ -421,7 +503,8 @@
 [data-theme="solstice"] .hljs-keyword,
 [data-theme="lagoon"] .hljs-keyword,
 [data-theme="dusk"] .hljs-keyword,
-[data-theme="stark-dark"] .hljs-keyword {
+[data-theme="stark-dark"] .hljs-keyword,
+[data-theme="twilight-reader"] .hljs-keyword {
   color: #ff7b72;
 }
 
@@ -430,7 +513,8 @@
 [data-theme="solstice"] .hljs-string,
 [data-theme="lagoon"] .hljs-string,
 [data-theme="dusk"] .hljs-string,
-[data-theme="stark-dark"] .hljs-string {
+[data-theme="stark-dark"] .hljs-string,
+[data-theme="twilight-reader"] .hljs-string {
   color: #a5d6ff;
 }
 
@@ -445,7 +529,9 @@
 [data-theme="dusk"] .hljs-title,
 [data-theme="dusk"] .hljs-function,
 [data-theme="stark-dark"] .hljs-title,
-[data-theme="stark-dark"] .hljs-function {
+[data-theme="stark-dark"] .hljs-function,
+[data-theme="twilight-reader"] .hljs-title,
+[data-theme="twilight-reader"] .hljs-function {
   color: #d2a8ff;
 }
 
@@ -454,7 +540,8 @@
 [data-theme="solstice"] .hljs-comment,
 [data-theme="lagoon"] .hljs-comment,
 [data-theme="dusk"] .hljs-comment,
-[data-theme="stark-dark"] .hljs-comment {
+[data-theme="stark-dark"] .hljs-comment,
+[data-theme="twilight-reader"] .hljs-comment {
   color: #8b949e;
 }
 
@@ -469,7 +556,9 @@
 [data-theme="dusk"] .hljs-number,
 [data-theme="dusk"] .hljs-literal,
 [data-theme="stark-dark"] .hljs-number,
-[data-theme="stark-dark"] .hljs-literal {
+[data-theme="stark-dark"] .hljs-literal,
+[data-theme="twilight-reader"] .hljs-number,
+[data-theme="twilight-reader"] .hljs-literal {
   color: #79c0ff;
 }
 
@@ -478,7 +567,8 @@
 [data-theme="solstice"] .hljs-built_in,
 [data-theme="lagoon"] .hljs-built_in,
 [data-theme="dusk"] .hljs-built_in,
-[data-theme="stark-dark"] .hljs-built_in {
+[data-theme="stark-dark"] .hljs-built_in,
+[data-theme="twilight-reader"] .hljs-built_in {
   color: #ffa657;
 }
 
@@ -493,6 +583,8 @@
 [data-theme="dusk"] .hljs-attr,
 [data-theme="dusk"] .hljs-attribute,
 [data-theme="stark-dark"] .hljs-attr,
-[data-theme="stark-dark"] .hljs-attribute {
+[data-theme="stark-dark"] .hljs-attribute,
+[data-theme="twilight-reader"] .hljs-attr,
+[data-theme="twilight-reader"] .hljs-attribute {
   color: #7ee787;
 }
