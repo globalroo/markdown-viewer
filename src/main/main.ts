@@ -33,7 +33,9 @@ function isPathAllowed(targetPath: string): boolean {
     resolved = path.resolve(targetPath);
   }
   for (const root of allowedRoots) {
-    if (resolved.startsWith(root + path.sep) || resolved === root) return true;
+    if (resolved === root) return true;
+    const prefix = root.endsWith(path.sep) ? root : root + path.sep;
+    if (resolved.startsWith(prefix)) return true;
   }
   return false;
 }

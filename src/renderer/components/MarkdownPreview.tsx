@@ -91,7 +91,10 @@ renderer.image = function (token: any) {
     // Rewrite relative/absolute local paths to custom protocol
     // The main process validates against allowedRoots when serving
     const cleanSrc = src.replace(/^\.\//, "");
-    const absolutePath = (currentFileDir + "/" + cleanSrc).replace(/\\/g, "/");
+    const isAbsolute = cleanSrc.startsWith("/") || /^[a-zA-Z]:[/\\]/.test(cleanSrc);
+    const absolutePath = isAbsolute
+      ? cleanSrc.replace(/\\/g, "/")
+      : (currentFileDir + "/" + cleanSrc).replace(/\\/g, "/");
     const urlPath = absolutePath.startsWith("/") ? absolutePath : "/" + absolutePath;
     // Encode path segments to handle # % and other URL-significant characters
     const encoded = urlPath.split("/").map((s) => encodeURIComponent(s)).join("/");
