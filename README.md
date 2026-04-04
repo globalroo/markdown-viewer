@@ -15,6 +15,10 @@
 - **Multi-project sidebar** — Add multiple folders, each shown as a collapsible section with its own file tree
 - **Search & filter** — Instantly narrow files by name across all projects
 - **Rich rendering** — CommonMark + GFM tables, task lists, syntax-highlighted code blocks (16 languages)
+- **Edit & preview** — Toggle between rendered preview and a raw markdown editor with `Cmd/Ctrl+E`. Save with `Cmd/Ctrl+S`, dirty indicator, and unsaved changes guard
+- **Rename files** — Right-click or press F2 to rename markdown files inline with full validation
+- **Drag & drop move** — Drag files between directories or across projects to move them on disk
+- **Copy to clipboard** — One-click copy of raw markdown content
 - **Local images** — Relative images resolve securely via a custom protocol with path validation
 - **Themes** — System-aware light/dark mode with manual toggle
 - **Font zoom** — Adjust reading size with keyboard shortcuts (10px–32px range)
@@ -86,7 +90,7 @@ alias viewmd='/Applications/viewmd.app/Contents/MacOS/viewmd'
 **Linux** — if using the AppImage, add to `~/.bashrc`:
 
 ```bash
-alias viewmd='/path/to/viewmd-1.2.0.AppImage'
+alias viewmd='/path/to/viewmd-1.3.0.AppImage'
 ```
 
 Then open any directory:
@@ -103,6 +107,9 @@ viewmd ~/projects/my-repo
 | Open folder | `Cmd+O` | `Ctrl+O` |
 | Toggle sidebar | `Cmd+B` | `Ctrl+B` |
 | Search files | `Cmd+F` | `Ctrl+F` |
+| Toggle edit/preview | `Cmd+E` | `Ctrl+E` |
+| Save (in edit mode) | `Cmd+S` | `Ctrl+S` |
+| Rename file | `F2` | `F2` |
 | Increase font | `Cmd++` | `Ctrl++` |
 | Decrease font | `Cmd+-` | `Ctrl+-` |
 | Reset font | `Cmd+0` | `Ctrl+0` |
@@ -113,9 +120,11 @@ viewmd ~/projects/my-repo
 
 - **Navigation lockdown** — All in-app navigation is blocked. External links open in the default browser.
 - **Path validation** — All file access is validated against explicitly opened project roots using `fs.realpathSync` to prevent symlink escapes and path traversal.
+- **Mutation safety** — Rename, move, and write operations enforce markdown extensions, reject path separators and reserved names, and validate both source and destination paths.
 - **Custom image protocol** — Local images are served through a custom `local-img://` Electron protocol that validates paths before serving, preventing access to files outside opened projects.
 - **Content Security Policy** — Restricts script, style, image, and font sources. `file://` is not permitted for images.
 - **DOMPurify** — All rendered markdown HTML is sanitized before injection.
+- **Draft protection** — Failed saves preserve dirty state; drafts are never silently discarded.
 
 ## Development
 
@@ -130,6 +139,12 @@ npx tsc -p tsconfig.main.json --noEmit  # main process
 
 # Full build
 npm run build
+
+# Run unit tests
+npm test
+
+# Run E2E tests (requires build first)
+npm run build && npm run test:e2e
 ```
 
 ### Project Structure
@@ -141,14 +156,18 @@ src/
     preload.ts       — contextBridge API for renderer
   renderer/
     App.tsx          — Root component, keyboard shortcuts, theming
-    store.ts         — Zustand state (projects, files, UI)
+    store.ts         — Zustand state (projects, files, edit mode, UI)
     components/
-      Sidebar.tsx    — Multi-project sidebar with search
-      FileTree.tsx   — Recursive file tree with filtering
-      MarkdownPreview.tsx — Markdown rendering via marked
+      Sidebar.tsx    — Multi-project sidebar with search and drop targets
+      FileTree.tsx   — Recursive file tree with rename, drag-drop
+      ContextMenu.tsx — Reusable right-click context menu
+      MarkdownPreview.tsx — Markdown rendering and edit mode
       Toolbar.tsx    — Font zoom, theme, print controls
     styles/
       app.css        — Theming, typography, scroll performance
+tests/
+  unit/              — Vitest unit tests (validation, store)
+  e2e/               — Playwright Electron end-to-end tests
 ```
 
 ## Tech Stack
@@ -162,6 +181,8 @@ src/
 - **Zustand** — Lightweight state management
 - **DOMPurify** — HTML sanitization
 - **electron-builder** — Packaging and distribution
+- **Vitest** — Unit testing
+- **Playwright** — Electron E2E testing
 
 ## License
 
