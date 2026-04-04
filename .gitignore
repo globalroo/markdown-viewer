@@ -10,3 +10,5 @@ Thumbs.db
 .gestalt/
 .codex/
 .gemini/
+.mcp.json
+test-docs/
