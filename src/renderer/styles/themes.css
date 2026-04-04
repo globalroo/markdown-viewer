@@ -21,7 +21,7 @@
 
   --text-primary: #1c1917;
   --text-secondary: #57534e;
-  --text-muted: #a8a29e;
+  --text-muted: #78716c;
   --text-link: #1d4ed8;
 
   --border-color: #e0ddd9;
@@ -48,7 +48,7 @@
 
   --text-primary: #e5e5e5;
   --text-secondary: #a3a3a3;
-  --text-muted: #636363;
+  --text-muted: #8a8a8a;
   --text-link: #60a5fa;
 
   --border-color: #2e2e2e;
@@ -75,7 +75,7 @@
 
   --text-primary: #ede9f6;
   --text-secondary: #b4a9cc;
-  --text-muted: #6e6388;
+  --text-muted: #9384ab;
   --text-link: #c084fc;
 
   --border-color: #362f48;
@@ -102,7 +102,7 @@
 
   --text-primary: #451a03;
   --text-secondary: #92400e;
-  --text-muted: #c2956c;
+  --text-muted: #96703e;
   --text-link: #dc2626;
 
   --border-color: #f5dfc0;
@@ -129,7 +129,7 @@
 
   --text-primary: #e2e8f0;
   --text-secondary: #94a3b8;
-  --text-muted: #475569;
+  --text-muted: #7086a4;
   --text-link: #fbbf24;
 
   --border-color: #1e293b;
@@ -156,7 +156,7 @@
 
   --text-primary: #3e2318;
   --text-secondary: #78543d;
-  --text-muted: #b08d74;
+  --text-muted: #8a6a4e;
   --text-link: #b45309;
 
   --border-color: #e2d0bc;
@@ -183,7 +183,7 @@
 
   --text-primary: #e0f2f1;
   --text-secondary: #80cbc4;
-  --text-muted: #4a7c75;
+  --text-muted: #6aa09a;
   --text-link: #4dd0e1;
 
   --border-color: #1e3338;
@@ -210,7 +210,7 @@
 
   --text-primary: #f0e4f0;
   --text-secondary: #c9a8c9;
-  --text-muted: #7a5c7a;
+  --text-muted: #a080a0;
   --text-link: #f472b6;
 
   --border-color: #3a2c40;
@@ -398,4 +398,101 @@
 /* Apply selection colour from theme */
 ::selection {
   background: var(--selection, rgba(59, 130, 246, 0.3));
+}
+
+/* ========================================
+   Syntax Highlighting — Dark Theme Overrides
+   The app imports highlight.js/styles/github.css (light).
+   These overrides make code blocks readable on dark backgrounds.
+   ======================================== */
+
+[data-theme="dark"] .hljs,
+[data-theme="aurora"] .hljs,
+[data-theme="solstice"] .hljs,
+[data-theme="lagoon"] .hljs,
+[data-theme="dusk"] .hljs,
+[data-theme="stark-dark"] .hljs {
+  color: #c9d1d9;
+  background: var(--bg-code);
+}
+
+[data-theme="dark"] .hljs-keyword,
+[data-theme="aurora"] .hljs-keyword,
+[data-theme="solstice"] .hljs-keyword,
+[data-theme="lagoon"] .hljs-keyword,
+[data-theme="dusk"] .hljs-keyword,
+[data-theme="stark-dark"] .hljs-keyword {
+  color: #ff7b72;
+}
+
+[data-theme="dark"] .hljs-string,
+[data-theme="aurora"] .hljs-string,
+[data-theme="solstice"] .hljs-string,
+[data-theme="lagoon"] .hljs-string,
+[data-theme="dusk"] .hljs-string,
+[data-theme="stark-dark"] .hljs-string {
+  color: #a5d6ff;
+}
+
+[data-theme="dark"] .hljs-title,
+[data-theme="dark"] .hljs-function,
+[data-theme="aurora"] .hljs-title,
+[data-theme="aurora"] .hljs-function,
+[data-theme="solstice"] .hljs-title,
+[data-theme="solstice"] .hljs-function,
+[data-theme="lagoon"] .hljs-title,
+[data-theme="lagoon"] .hljs-function,
+[data-theme="dusk"] .hljs-title,
+[data-theme="dusk"] .hljs-function,
+[data-theme="stark-dark"] .hljs-title,
+[data-theme="stark-dark"] .hljs-function {
+  color: #d2a8ff;
+}
+
+[data-theme="dark"] .hljs-comment,
+[data-theme="aurora"] .hljs-comment,
+[data-theme="solstice"] .hljs-comment,
+[data-theme="lagoon"] .hljs-comment,
+[data-theme="dusk"] .hljs-comment,
+[data-theme="stark-dark"] .hljs-comment {
+  color: #8b949e;
+}
+
+[data-theme="dark"] .hljs-number,
+[data-theme="dark"] .hljs-literal,
+[data-theme="aurora"] .hljs-number,
+[data-theme="aurora"] .hljs-literal,
+[data-theme="solstice"] .hljs-number,
+[data-theme="solstice"] .hljs-literal,
+[data-theme="lagoon"] .hljs-number,
+[data-theme="lagoon"] .hljs-literal,
+[data-theme="dusk"] .hljs-number,
+[data-theme="dusk"] .hljs-literal,
+[data-theme="stark-dark"] .hljs-number,
+[data-theme="stark-dark"] .hljs-literal {
+  color: #79c0ff;
+}
+
+[data-theme="dark"] .hljs-built_in,
+[data-theme="aurora"] .hljs-built_in,
+[data-theme="solstice"] .hljs-built_in,
+[data-theme="lagoon"] .hljs-built_in,
+[data-theme="dusk"] .hljs-built_in,
+[data-theme="stark-dark"] .hljs-built_in {
+  color: #ffa657;
+}
+
+[data-theme="dark"] .hljs-attr,
+[data-theme="dark"] .hljs-attribute,
+[data-theme="aurora"] .hljs-attr,
+[data-theme="aurora"] .hljs-attribute,
+[data-theme="solstice"] .hljs-attr,
+[data-theme="solstice"] .hljs-attribute,
+[data-theme="lagoon"] .hljs-attr,
+[data-theme="lagoon"] .hljs-attribute,
+[data-theme="dusk"] .hljs-attr,
+[data-theme="dusk"] .hljs-attribute,
+[data-theme="stark-dark"] .hljs-attr,
+[data-theme="stark-dark"] .hljs-attribute {
+  color: #7ee787;
 }

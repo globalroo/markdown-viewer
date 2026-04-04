@@ -1,8 +1,29 @@
+import { useEffect, useRef, useCallback } from "react";
 import { useAppStore, THEMES, FONTS, type ThemeId, type FontId } from "../store";
 
 export function Settings() {
   const { theme, setTheme, font, setFont, settingsOpen, toggleSettings } =
     useAppStore();
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  // Escape key and focus management
+  useEffect(() => {
+    if (!settingsOpen) return;
+
+    // Focus the panel on open
+    panelRef.current?.focus();
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        toggleSettings();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown, true);
+    return () => window.removeEventListener("keydown", handleKeyDown, true);
+  }, [settingsOpen, toggleSettings]);
 
   if (!settingsOpen) return null;
 
@@ -13,10 +34,13 @@ export function Settings() {
   return (
     <div className="settings-overlay" onClick={toggleSettings}>
       <div
+        ref={panelRef}
         className="settings-panel"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
+        aria-modal="true"
         aria-label="Settings"
+        tabIndex={-1}
       >
         <div className="settings-header">
           <h2>Settings</h2>
