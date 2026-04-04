@@ -619,15 +619,15 @@ body {
 .settings-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.4);
+  background: rgba(0, 0, 0, 0.5);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 100;
-  backdrop-filter: blur(2px);
 }
 
 .settings-panel {
+  position: relative;
   background: var(--bg-app);
   border: 1px solid var(--border-color);
   border-radius: 12px;
@@ -668,11 +668,22 @@ body {
 
 .settings-body {
   overflow-y: auto;
+  overscroll-behavior: contain;
+  contain: paint;
   padding: 20px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+  will-change: scroll-position;
 }
+
+/* Removed scroll fade gradient — paint cost on Intel Mac */
 
 .settings-section {
   margin-bottom: 24px;
+}
+
+.settings-section:last-child {
+  padding-bottom: 24px;
 }
 
 .settings-section:last-child {
