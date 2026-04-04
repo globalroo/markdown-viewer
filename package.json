@@ -3,7 +3,7 @@
   "version": "1.2.0",
   "description": "A cross-platform desktop app for discovering and reading markdown files",
   "main": "dist/main/main.js",
-  "author": "globalroo",
+  "author": "globalroo <globalroo@hotmail.com>",
   "license": "MIT",
   "scripts": {
     "dev": "vite",
