@@ -15,7 +15,7 @@ Open any folder, instantly see every markdown file in a searchable tree, and rea
 - **Print** — Print the rendered markdown, not the raw source
 - **File associations** — Register as the default handler for `.md` and `.markdown` files
 - **CLI launch** — Open from the terminal pointing at any directory
-- **Cross-platform** — macOS and Windows
+- **Cross-platform** — macOS, Windows, and Linux
 - **Accessible** — ARIA labels, semantic landmarks, keyboard-navigable
 
 ## Download
@@ -24,6 +24,7 @@ Pre-built binaries are automatically built on each release via GitHub Actions an
 
 - **macOS**: `.dmg` installer
 - **Windows**: `.exe` installer (NSIS)
+- **Linux**: `.AppImage` portable binary and `.deb` package
 
 ## Build from Source
 
@@ -59,6 +60,7 @@ npm run dist
 # Or target a specific platform
 npx electron-builder --mac
 npx electron-builder --win
+npx electron-builder --linux
 ```
 
 The packaged app will be in the `release/` directory.
@@ -74,6 +76,12 @@ alias viewmd='/Applications/viewmd.app/Contents/MacOS/viewmd'
 ```
 
 **Windows** — add the install directory to your PATH, or create a batch file.
+
+**Linux** — if using the AppImage, add to `~/.bashrc`:
+
+```bash
+alias viewmd='/path/to/viewmd-1.2.0.AppImage'
+```
 
 Then open any directory:
 
