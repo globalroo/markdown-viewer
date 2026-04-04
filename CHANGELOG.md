@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.4.1] - 2026-04-04
+
+### Added
+
+- **Elegant print output** — comprehensive print styles producing well-typeset documents. 11pt body, booktabs tables, smart link URLs, orphans/widows control.
+- Typography preferences (line height, font) carry into print.
+- Theme colours stripped for B&W printer compatibility.
+- Syntax highlighting stripped in print (comments preserved in italic grey).
+- Printing from edit mode now shows preview content instead of blank page.
+- 5 new E2E print tests (140 total).
+
 ## [1.4.0] - 2026-04-04
 
 ### Added
