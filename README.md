@@ -82,21 +82,32 @@ The packaged app will be in the `release/` directory.
 
 ### Global CLI Access
 
-After packaging and installing, create a shell alias so you can launch from anywhere:
+Launch viewmd from any terminal to open a folder of markdown files.
 
-**macOS** — add to `~/.zshrc` or `~/.bashrc`:
-
-```bash
-alias viewmd='/Applications/viewmd.app/Contents/MacOS/viewmd'
-```
-
-**Windows** — add the install directory to your PATH, or create a batch file.
-
-**Linux** — if using the AppImage, add to `~/.bashrc`:
+**macOS** — create a CLI wrapper (works with any shell):
 
 ```bash
-alias viewmd='/path/to/viewmd-1.3.0.AppImage'
+sudo tee /usr/local/bin/viewmd > /dev/null << 'EOF'
+#!/bin/bash
+open -a viewmd --args "$@"
+EOF
+sudo chmod +x /usr/local/bin/viewmd
 ```
+
+**Windows** — create `viewmd.cmd` somewhere in your PATH:
+
+```cmd
+@echo off
+start "" "%LOCALAPPDATA%\Programs\viewmd\viewmd.exe" %*
+```
+
+**Linux** — if using the AppImage:
+
+```bash
+sudo ln -sf /path/to/viewmd-1.4.1.AppImage /usr/local/bin/viewmd
+```
+
+Or if using the `.deb` package, `viewmd` should already be in your PATH.
 
 Then open any directory:
 
