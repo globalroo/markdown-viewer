@@ -20,7 +20,12 @@
 - **Drag & drop move** — Drag files between directories or across projects to move them on disk
 - **Copy to clipboard** — One-click copy of raw markdown content
 - **Local images** — Relative images resolve securely via a custom protocol with path validation
-- **Themes** — System-aware light/dark mode with manual toggle
+- **Reading comfort themes** — Sepia, Sage (green, research-backed), and Twilight Reader themes designed for long reading sessions. WCAG AA contrast verified
+- **Typography controls** — Adjustable line width (Narrow/Standard/Wide) and line spacing (Compact/Optimal/Relaxed) in Settings
+- **Focus mode** — `Cmd/Ctrl+Shift+F` hides all chrome for distraction-free reading. Escape to exit
+- **Warm filter** — Subtle evening reading filter that reduces blue light. Toggle in Settings
+- **Reading progress** — Thin progress bar tracks your scroll position through a document
+- **Themes** — 17 themes: system-aware light/dark, reading comfort, colour, and accessibility options
 - **Font zoom** — Adjust reading size with keyboard shortcuts (10px–32px range)
 - **Print** — Print the rendered markdown, not the raw source
 - **File associations** — Register as the default handler for `.md` and `.markdown` files
@@ -110,6 +115,8 @@ viewmd ~/projects/my-repo
 | Toggle edit/preview | `Cmd+E` | `Ctrl+E` |
 | Save (in edit mode) | `Cmd+S` | `Ctrl+S` |
 | Rename file | `F2` | `F2` |
+| Focus mode | `Cmd+Shift+F` | `Ctrl+Shift+F` |
+| Exit focus mode | `Escape` | `Escape` |
 | Increase font | `Cmd++` | `Ctrl++` |
 | Decrease font | `Cmd+-` | `Ctrl+-` |
 | Reset font | `Cmd+0` | `Ctrl+0` |

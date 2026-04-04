@@ -2,7 +2,7 @@ import { useEffect, useRef, useCallback } from "react";
 import { useAppStore, THEMES, FONTS, type ThemeId, type FontId } from "../store";
 
 export function Settings() {
-  const { theme, setTheme, font, setFont, settingsOpen, toggleSettings } =
+  const { theme, setTheme, font, setFont, contentWidth, setContentWidth, lineHeight, setLineHeight, warmFilter, toggleWarmFilter, settingsOpen, toggleSettings } =
     useAppStore();
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -28,6 +28,7 @@ export function Settings() {
   if (!settingsOpen) return null;
 
   const coreThemes = THEMES.filter((t) => t.group === "core");
+  const readingThemes = THEMES.filter((t) => t.group === "reading");
   const colourThemes = THEMES.filter((t) => t.group === "colour");
   const a11yThemes = THEMES.filter((t) => t.group === "accessibility");
 
@@ -63,6 +64,18 @@ export function Settings() {
             <div className="settings-group-label">Core</div>
             <div className="theme-grid">
               {coreThemes.map((t) => (
+                <ThemeSwatch
+                  key={t.id}
+                  theme={t}
+                  active={theme === t.id}
+                  onSelect={setTheme}
+                />
+              ))}
+            </div>
+
+            <div className="settings-group-label">Reading Comfort</div>
+            <div className="theme-grid">
+              {readingThemes.map((t) => (
                 <ThemeSwatch
                   key={t.id}
                   theme={t}
@@ -112,6 +125,47 @@ export function Settings() {
               ))}
             </div>
           </section>
+
+          <section className="settings-section">
+            <h3>Reading Layout</h3>
+
+            <div className="settings-group-label">Line Width</div>
+            <div className="segmented-control" role="group" aria-label="Line width">
+              {([["narrow", "Narrow"], ["standard", "Standard"], ["wide", "Wide"]] as const).map(([id, label]) => (
+                <button
+                  key={id}
+                  className={`segmented-btn ${contentWidth === id ? "active" : ""}`}
+                  onClick={() => setContentWidth(id)}
+                  aria-pressed={contentWidth === id}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            <div className="settings-group-label">Line Spacing</div>
+            <div className="segmented-control" role="group" aria-label="Line spacing">
+              {([["compact", "Compact"], ["optimal", "Optimal"], ["relaxed", "Relaxed"]] as const).map(([id, label]) => (
+                <button
+                  key={id}
+                  className={`segmented-btn ${lineHeight === id ? "active" : ""}`}
+                  onClick={() => setLineHeight(id)}
+                  aria-pressed={lineHeight === id}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            <div className="settings-group-label">Comfort</div>
+            <button
+              className={`toggle-option ${warmFilter ? "active" : ""}`}
+              onClick={toggleWarmFilter}
+            >
+              <span className="toggle-option-label">Warm filter</span>
+              <span className="toggle-option-desc">Reduces blue light for evening reading</span>
+            </button>
+          </section>
         </div>
       </div>
     </div>
@@ -133,6 +187,9 @@ const SWATCH_COLOURS: Record<ThemeId, { bg: string; sidebar: string; accent: str
   clarity: { bg: "#f8f7f4", sidebar: "#eeedea", accent: "#0066cc", text: "#1a1a1a" },
   terrain: { bg: "#f5f5eb", sidebar: "#eaeade", accent: "#2255aa", text: "#1a1a0e" },
   sapphire: { bg: "#f7f5f5", sidebar: "#ece8e8", accent: "#b91c1c", text: "#1a1414" },
+  sepia: { bg: "#f5f0e8", sidebar: "#ece5d8", accent: "#a0774a", text: "#3b2e1e" },
+  sage: { bg: "#eaf4e2", sidebar: "#e0ebd8", accent: "#4a8a5a", text: "#253126" },
+  "twilight-reader": { bg: "#1a1a2e", sidebar: "#20203a", accent: "#7eb8da", text: "#d4d0cc" },
 };
 
 function ThemeSwatch({

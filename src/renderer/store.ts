@@ -14,7 +14,10 @@ export type ThemeId =
   | "stark-dark"
   | "clarity"
   | "terrain"
-  | "sapphire";
+  | "sapphire"
+  | "sepia"
+  | "sage"
+  | "twilight-reader";
 
 export type FontId =
   | "system"
@@ -27,13 +30,16 @@ export type FontId =
 export interface ThemeOption {
   id: ThemeId;
   name: string;
-  group: "core" | "colour" | "accessibility";
+  group: "core" | "colour" | "accessibility" | "reading";
 }
 
 export const THEMES: ThemeOption[] = [
   { id: "system", name: "System", group: "core" },
   { id: "light", name: "Light", group: "core" },
   { id: "dark", name: "Dark", group: "core" },
+  { id: "sepia", name: "Sepia", group: "reading" },
+  { id: "sage", name: "Sage", group: "reading" },
+  { id: "twilight-reader", name: "Twilight Reader", group: "reading" },
   { id: "aurora", name: "Aurora", group: "colour" },
   { id: "prism", name: "Prism", group: "colour" },
   { id: "solstice", name: "Solstice", group: "colour" },
@@ -82,6 +88,12 @@ interface AppState {
   sidebarVisible: boolean;
   settingsOpen: boolean;
 
+  // Reading comfort
+  contentWidth: "narrow" | "standard" | "wide";
+  lineHeight: "compact" | "optimal" | "relaxed";
+  focusMode: boolean;
+  warmFilter: boolean;
+
   // Edit mode state
   editMode: boolean;
   editContent: string;
@@ -107,6 +119,12 @@ interface AppState {
   toggleSidebar: () => void;
   toggleSettings: () => void;
 
+  // Reading comfort actions
+  setContentWidth: (width: "narrow" | "standard" | "wide") => void;
+  setLineHeight: (height: "compact" | "optimal" | "relaxed") => void;
+  toggleFocusMode: () => void;
+  toggleWarmFilter: () => void;
+
   // Edit mode actions
   setEditMode: (mode: boolean) => void;
   setEditContent: (content: string) => void;
@@ -130,6 +148,10 @@ export const useAppStore = create<AppState>((set) => ({
   font: "system",
   sidebarVisible: true,
   settingsOpen: false,
+  contentWidth: "standard",
+  lineHeight: "optimal",
+  focusMode: false,
+  warmFilter: false,
   editMode: false,
   editContent: "",
   editDirty: false,
@@ -217,6 +239,16 @@ export const useAppStore = create<AppState>((set) => ({
 
   toggleSettings: () =>
     set((state) => ({ settingsOpen: !state.settingsOpen })),
+
+  setContentWidth: (width) => set({ contentWidth: width }),
+
+  setLineHeight: (height) => set({ lineHeight: height }),
+
+  toggleFocusMode: () =>
+    set((state) => ({ focusMode: !state.focusMode })),
+
+  toggleWarmFilter: () =>
+    set((state) => ({ warmFilter: !state.warmFilter })),
 
   setEditMode: (mode) =>
     set((state) => {
