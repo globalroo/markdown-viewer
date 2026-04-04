@@ -335,6 +335,8 @@ body {
 }
 
 .tree-label {
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -954,6 +956,18 @@ body {
 .dirty-indicator {
   color: var(--accent, #4A90D9);
   font-size: 0.9em;
+}
+
+/* File count badge */
+.tree-count-badge {
+  margin-left: auto;
+  padding: 0 6px;
+  font-size: 11px;
+  line-height: 18px;
+  border-radius: 9px;
+  background: var(--bg-hover);
+  color: var(--text-muted);
+  flex-shrink: 0;
 }
 
 /* Context menu */

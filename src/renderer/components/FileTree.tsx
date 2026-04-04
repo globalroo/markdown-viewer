@@ -1,7 +1,25 @@
 import { useAppStore } from "../store";
-import { useCallback, useMemo, useState, useRef, useEffect } from "react";
+import { useCallback, useMemo, useState, useRef, useEffect, memo } from "react";
 import { ChevronIcon, FolderIcon, FileIcon } from "./Icons";
 import { ContextMenu } from "./ContextMenu";
+
+function countFiles(nodes: TreeNode[]): number {
+  let count = 0;
+  for (const node of nodes) {
+    if (node.type === "file") count++;
+    else if (node.children) count += countFiles(node.children);
+  }
+  return count;
+}
+
+function buildCountMap(nodes: TreeNode[], map: Map<string, number>): void {
+  for (const node of nodes) {
+    if (node.type === "directory" && node.children) {
+      map.set(node.path, countFiles(node.children));
+      buildCountMap(node.children, map);
+    }
+  }
+}
 
 function filterTree(nodes: TreeNode[], query: string): TreeNode[] {
   if (!query) return nodes;
@@ -97,10 +115,12 @@ function TreeItem({
   node,
   depth,
   projectRootPath,
+  fileCountMap,
 }: {
   node: TreeNode;
   depth: number;
   projectRootPath: string;
+  fileCountMap: Map<string, number>;
 }) {
   const { expandedDirs, toggleDir, selectedFile, selectFile, renamingPath, setRenamingPath } = useAppStore();
   const isExpanded = expandedDirs.has(node.path);
@@ -236,6 +256,11 @@ function TreeItem({
         ) : (
           <span className="tree-label">{node.name}</span>
         )}
+        {node.type === "directory" && fileCountMap.has(node.path) && (
+          <span className="tree-count-badge" aria-label={`${fileCountMap.get(node.path)} files`}>
+            {fileCountMap.get(node.path)}
+          </span>
+        )}
       </button>
 
       {contextMenu && (
@@ -255,7 +280,7 @@ function TreeItem({
       {node.type === "directory" && isExpanded && node.children && (
         <div className="tree-children">
           {node.children.map((child) => (
-            <TreeItem key={child.path} node={child} depth={depth + 1} projectRootPath={projectRootPath} />
+            <TreeItem key={child.path} node={child} depth={depth + 1} projectRootPath={projectRootPath} fileCountMap={fileCountMap} />
           ))}
         </div>
       )}
@@ -277,6 +302,13 @@ export function FileTree({
     [tree, searchQuery]
   );
 
+  // Compute counts from the ORIGINAL tree so badges are stable during search
+  const fileCountMap = useMemo(() => {
+    const map = new Map<string, number>();
+    buildCountMap(tree, map);
+    return map;
+  }, [tree]);
+
   if (filteredTree.length === 0 && searchQuery) {
     return <div className="tree-empty">No matches</div>;
   }
@@ -288,7 +320,7 @@ export function FileTree({
   return (
     <div className="file-tree">
       {filteredTree.map((node) => (
-        <TreeItem key={node.path} node={node} depth={0} projectRootPath={projectRootPath} />
+        <TreeItem key={node.path} node={node} depth={0} projectRootPath={projectRootPath} fileCountMap={fileCountMap} />
       ))}
     </div>
   );
