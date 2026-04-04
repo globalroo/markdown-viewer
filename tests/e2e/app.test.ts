@@ -694,3 +694,124 @@ test("progress bar is not stuck at zero after edit mode round-trip", async () =>
 
   expect(transform).not.toBe("matrix(0, 0, 0, 1, 0, 0)");
 });
+
+// ---------------------------------------------------------------------------
+// 28. Print produces a PDF without errors
+// ---------------------------------------------------------------------------
+
+test("printToPDF succeeds and produces non-empty output", async () => {
+  await openTestFolder();
+  await selectFileByName("README.md");
+
+  // Use Electron's printToPDF API
+  const pdfBuffer = await app.evaluate(async ({ BrowserWindow }) => {
+    const win = BrowserWindow.getAllWindows()[0];
+    const pdf = await win.webContents.printToPDF({
+      printBackground: false,
+      pageSize: "A4",
+    });
+    return pdf.length;
+  });
+
+  expect(pdfBuffer).toBeGreaterThan(0);
+});
+
+// ---------------------------------------------------------------------------
+// 29. Print styles strip theme colours
+// ---------------------------------------------------------------------------
+
+test("print media query forces black text on white background", async () => {
+  await openTestFolder();
+  await selectFileByName("README.md");
+
+  // Apply a coloured theme first
+  await page.click('[aria-label="Open settings"]');
+  await expect(page.locator(".settings-panel")).toBeVisible();
+  const sepiaSwatch = page.locator('.theme-swatch', { has: page.locator('.swatch-label:text-is("Sepia")') });
+  await sepiaSwatch.click();
+
+  // Emulate print media
+  await page.emulateMedia({ media: "print" });
+
+  const styles = await page.locator(".preview-content").evaluate((el) => {
+    const cs = getComputedStyle(el);
+    return {
+      color: cs.color,
+      backgroundColor: cs.backgroundColor,
+    };
+  });
+
+  // Should be black text on white background regardless of theme
+  expect(styles.color).toBe("rgb(0, 0, 0)");
+  expect(styles.backgroundColor).toBe("rgb(255, 255, 255)");
+});
+
+// ---------------------------------------------------------------------------
+// 30. Print honours line-height setting
+// ---------------------------------------------------------------------------
+
+test("print media honours the user line-height preference", async () => {
+  await openTestFolder();
+  await selectFileByName("README.md");
+
+  // Get default print line-height
+  await page.emulateMedia({ media: "print" });
+  const defaultLH = await page.locator(".preview-content").evaluate((el) =>
+    getComputedStyle(el).lineHeight
+  );
+
+  // Switch back to screen, change to relaxed
+  await page.emulateMedia({ media: "screen" });
+  await page.click('[aria-label="Open settings"]');
+  await expect(page.locator(".settings-panel")).toBeVisible();
+  const body = page.locator(".settings-body");
+  await body.evaluate((el) => el.scrollTop = el.scrollHeight);
+  await page.click('.segmented-btn:text-is("Relaxed")');
+  await page.keyboard.press("Escape");
+
+  // Check print again — should be different from default
+  await page.emulateMedia({ media: "print" });
+  const relaxedLH = await page.locator(".preview-content").evaluate((el) =>
+    getComputedStyle(el).lineHeight
+  );
+
+  expect(relaxedLH).not.toBe(defaultLH);
+});
+
+// ---------------------------------------------------------------------------
+// 31. Print hides chrome elements
+// ---------------------------------------------------------------------------
+
+test("print media hides toolbar, sidebar, and edit controls", async () => {
+  await openTestFolder();
+  await selectFileByName("README.md");
+
+  await page.emulateMedia({ media: "print" });
+
+  await expect(page.locator(".toolbar")).toBeHidden();
+  await expect(page.locator(".sidebar")).toBeHidden();
+  await expect(page.locator(".preview-header")).toBeHidden();
+  await expect(page.locator(".progress-bar-track")).toBeHidden();
+});
+
+// ---------------------------------------------------------------------------
+// 32. Print from edit mode shows preview content, not blank page
+// ---------------------------------------------------------------------------
+
+test("printing from edit mode shows preview content", async () => {
+  await openTestFolder();
+  await selectFileByName("README.md");
+
+  // Enter edit mode
+  await page.click('.preview-mode-btn:text-is("Edit")');
+  await expect(page.locator(".edit-textarea")).toBeVisible();
+
+  // Emulate print media
+  await page.emulateMedia({ media: "print" });
+
+  // Preview content should be visible (forced by print CSS)
+  await expect(page.locator(".preview-content")).toBeVisible();
+
+  // Textarea should be hidden
+  await expect(page.locator(".edit-textarea")).toBeHidden();
+});

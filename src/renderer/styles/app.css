@@ -894,11 +894,45 @@ body {
    Print Styles
    ======================================== */
 
+/* ========================================
+   Print Styles — Elegant Document Output
+
+   Design goals:
+   - Typography carries into print (font family, line height)
+   - Theme colours stripped (B&W printer friendly)
+   - Output resembles a well-typeset document
+   ======================================== */
+
 @media print {
+
+  /* ── Page Setup ── */
+
+  @page {
+    size: auto;
+    margin: 20mm 18mm 25mm;
+  }
+
+  /* ── Hide all chrome ── */
+
   .toolbar,
   .sidebar,
-  .preview-header {
+  .preview-header,
+  .progress-bar-track,
+  .settings-overlay,
+  .edit-textarea,
+  .preview-mode-toggle,
+  .preview-copy-btn,
+  .preview-save-btn,
+  .context-menu,
+  .context-menu-backdrop {
     display: none !important;
+  }
+
+  /* ── Unbox the layout ── */
+
+  html, body, #root {
+    height: auto;
+    overflow: visible;
   }
 
   .app {
@@ -922,51 +956,286 @@ body {
   .preview-scroll {
     overflow: visible;
     height: auto;
+    contain: none;
   }
 
+  /* ── Strip warm filter ── */
+
+  .warm-filter {
+    filter: none !important;
+  }
+
+  /* ── Force preview content visible even when editing ── */
+
   .preview-content {
-    max-width: none;
+    display: block !important;
+  }
+
+  /* ── Base Typography ── */
+
+  .preview-content {
+    max-width: 42em;
+    margin: 0 auto;
     padding: 0;
-    font-size: 12pt;
+    font-size: 11pt;
+    line-height: var(--line-height, 1.45);
     color: #000;
     background: #fff;
   }
 
-  .preview-content pre code {
+  /* ── Heading Hierarchy (major third scale) ── */
+
+  .preview-content h1,
+  .preview-content h2,
+  .preview-content h3,
+  .preview-content h4,
+  .preview-content h5,
+  .preview-content h6 {
+    color: #000;
+    font-weight: 700;
+    line-height: 1.2;
+    margin-top: 1.8em;
+    margin-bottom: 0.4em;
+    border: none;
+    padding-bottom: 0;
+  }
+
+  .preview-content h1 {
+    font-size: 22pt;
+    border-bottom: 1.5pt solid #000;
+    padding-bottom: 0.2em;
+    margin-top: 0;
+    margin-bottom: 0.6em;
+  }
+
+  .preview-content h2 {
+    font-size: 16pt;
+  }
+
+  .preview-content h3 {
+    font-size: 13pt;
+    font-weight: 600;
+  }
+
+  .preview-content h4 {
+    font-size: 11pt;
+    font-weight: 700;
+  }
+
+  .preview-content h5 {
+    font-size: 11pt;
+    font-weight: 600;
+    font-style: italic;
+  }
+
+  .preview-content h6 {
+    font-size: 10pt;
+    font-weight: 600;
+    color: #444;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  /* ── Paragraphs ── */
+
+  .preview-content p {
+    margin-bottom: 0.7em;
+    orphans: 3;
+    widows: 3;
+  }
+
+  /* ── Code Blocks (strip syntax colours) ── */
+
+  .preview-content pre code,
+  .preview-content pre code[class*="hljs"] {
+    background: #f5f5f5;
+    border: 0.5pt solid #d0d0d0;
+    border-radius: 2pt;
+    padding: 10pt 12pt;
+    font-size: 9pt;
+    line-height: 1.45;
+    color: #1a1a1a;
     white-space: pre-wrap;
     word-break: break-all;
-    border: 1px solid #ccc;
+    display: block;
   }
+
+  .preview-content .hljs,
+  .preview-content .hljs * {
+    color: #1a1a1a !important;
+    background: transparent !important;
+    font-style: normal !important;
+  }
+
+  /* Preserve comment distinction — useful in B&W */
+  .preview-content .hljs-comment,
+  .preview-content .hljs-quote {
+    color: #666 !important;
+    font-style: italic !important;
+  }
+
+  /* Inline code */
+  .preview-content code {
+    background: #f0f0f0;
+    border: 0.5pt solid #ddd;
+    border-radius: 1.5pt;
+    padding: 0.1em 0.35em;
+    font-size: 0.88em;
+    color: #1a1a1a;
+  }
+
+  /* ── Blockquotes ── */
+
+  .preview-content blockquote {
+    border-left: 3pt solid #999;
+    border-top: none;
+    border-right: none;
+    border-bottom: none;
+    background: none;
+    padding: 0.2em 0 0.2em 1.2em;
+    margin: 1em 0 1em 0.5em;
+    color: #333;
+    font-style: italic;
+  }
+
+  .preview-content blockquote blockquote {
+    border-left: 2pt solid #ccc;
+    margin-left: 0.5em;
+    color: #555;
+  }
+
+  /* ── Tables (booktabs academic style) ── */
+
+  .preview-content table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1.2em 0;
+    font-size: 10pt;
+    border-top: 1.5pt solid #000;
+    border-bottom: 1.5pt solid #000;
+  }
+
+  .preview-content th {
+    background: none;
+    font-weight: 700;
+    border-bottom: 0.75pt solid #000;
+    border-top: none;
+    border-left: none;
+    border-right: none;
+    padding: 6pt 10pt;
+    text-align: left;
+  }
+
+  .preview-content td {
+    border: none;
+    border-bottom: 0.25pt solid #ddd;
+    padding: 5pt 10pt;
+  }
+
+  .preview-content tr:last-child td {
+    border-bottom: none;
+  }
+
+  .preview-content tr:nth-child(even) td {
+    background: #fafafa;
+  }
+
+  /* ── Images ── */
+
+  .preview-content img {
+    max-width: 100%;
+    height: auto;
+    page-break-inside: avoid;
+    break-inside: avoid;
+    margin: 0.8em 0;
+  }
+
+  /* ── Links ── */
 
   .preview-content a {
     color: #000;
     text-decoration: underline;
+    text-decoration-thickness: 0.5pt;
+    text-underline-offset: 2pt;
   }
 
-  .preview-content a::after {
-    content: " (" attr(href) ")";
-    font-size: 0.8em;
+  .preview-content a[href]::after {
+    content: " [" attr(href) "]";
+    font-size: 0.75em;
     color: #666;
+    font-style: italic;
+    text-decoration: none;
+    word-break: break-all;
   }
 
-  .preview-content img {
-    max-width: 100%;
-    page-break-inside: avoid;
+  .preview-content a[href^="#"]::after,
+  .preview-content a[href^="javascript"]::after,
+  .preview-content a[href=""]::after {
+    content: none;
   }
 
-  h1, h2, h3, h4, h5, h6 {
+  /* ── Page Break Control ── */
+
+  .preview-content li {
+    orphans: 3;
+    widows: 3;
+  }
+
+  .preview-content h1,
+  .preview-content h2,
+  .preview-content h3,
+  .preview-content h4,
+  .preview-content h5,
+  .preview-content h6 {
     page-break-after: avoid;
+    break-after: avoid;
   }
 
-  pre, blockquote, table {
+  .preview-content pre,
+  .preview-content blockquote,
+  .preview-content table,
+  .preview-content figure {
     page-break-inside: avoid;
+    break-inside: avoid;
   }
 
-  .edit-textarea,
-  .preview-mode-toggle,
-  .preview-copy-btn,
-  .preview-save-btn {
-    display: none !important;
+  /* ── Task Lists ── */
+
+  .preview-content .task-list input[type="checkbox"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 0.9em;
+    height: 0.9em;
+    border: 1pt solid #666;
+    border-radius: 1.5pt;
+    vertical-align: -0.1em;
+    margin-right: 0.3em;
+    background: #fff;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .preview-content .task-list input[type="checkbox"]:checked {
+    background: #000;
+    border-color: #000;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  /* ── Horizontal Rules ── */
+
+  .preview-content hr {
+    border: none;
+    border-top: 0.75pt solid #999;
+    margin: 2em 0;
+  }
+
+  /* ── Lists ── */
+
+  .preview-content ul,
+  .preview-content ol {
+    padding-left: 2em;
+    margin-bottom: 0.8em;
   }
 }
 

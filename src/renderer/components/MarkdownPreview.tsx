@@ -377,7 +377,7 @@ export function MarkdownPreview() {
         ref={scrollRef}
         style={{ fontSize: `${fontSize}px` }}
       >
-        {editMode ? (
+        {editMode && (
           <textarea
             ref={textareaRef}
             className="edit-textarea"
@@ -386,12 +386,12 @@ export function MarkdownPreview() {
             onKeyDown={handleTabKey}
             spellCheck={false}
           />
-        ) : (
-          <div
-            className="preview-content"
-            dangerouslySetInnerHTML={{ __html: html }}
-          />
         )}
+        <div
+          className="preview-content"
+          style={editMode ? { display: "none" } : undefined}
+          dangerouslySetInnerHTML={{ __html: html }}
+        />
       </div>
     </div>
   );
