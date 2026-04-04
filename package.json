@@ -16,8 +16,9 @@
     "dist": "npm run build && electron-builder"
   },
   "build": {
-    "appId": "com.globalroo.markdown-viewer",
-    "productName": "Markdown Viewer",
+    "appId": "com.globalroo.viewmd",
+    "productName": "viewmd",
+    "executableName": "viewmd",
     "directories": {
       "output": "release"
     },
@@ -64,15 +65,10 @@
   "dependencies": {
     "@types/dompurify": "^3.0.5",
     "dompurify": "^3.3.3",
-    "electron": "^41.1.1",
     "highlight.js": "^11.11.1",
     "marked": "^17.0.5",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
-    "react-markdown": "^10.1.0",
-    "rehype-highlight": "^7.0.2",
-    "rehype-slug": "^6.0.0",
-    "remark-gfm": "^4.0.1",
     "zustand": "^5.0.12"
   },
   "devDependencies": {
@@ -80,6 +76,7 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
     "concurrently": "^9.2.1",
+    "electron": "^41.1.1",
     "electron-builder": "^26.8.1",
     "typescript": "^6.0.2",
     "vite": "^8.0.3"

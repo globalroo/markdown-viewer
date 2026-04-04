@@ -156,7 +156,7 @@ export function MarkdownPreview() {
     return (
       <div className="preview-empty">
         <div className="preview-empty-content">
-          <h2>Markdown Viewer</h2>
+          <h2>viewmd</h2>
           <p>Select a file from the sidebar to start reading</p>
           <div className="shortcut-list">
             <div><kbd>{mod}O</kbd> Open folder</div>

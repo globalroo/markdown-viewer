@@ -1,4 +1,4 @@
-# Markdown Viewer
+# viewmd
 
 A fast, cross-platform desktop app for discovering and reading markdown files in repositories and project directories.
 
@@ -70,7 +70,7 @@ After packaging and installing, create a shell alias so you can launch from anyw
 **macOS** — add to `~/.zshrc` or `~/.bashrc`:
 
 ```bash
-alias markdown-viewer='/Applications/Markdown\ Viewer.app/Contents/MacOS/Markdown\ Viewer'
+alias viewmd='/Applications/viewmd.app/Contents/MacOS/viewmd'
 ```
 
 **Windows** — add the install directory to your PATH, or create a batch file.
@@ -78,8 +78,8 @@ alias markdown-viewer='/Applications/Markdown\ Viewer.app/Contents/MacOS/Markdow
 Then open any directory:
 
 ```bash
-markdown-viewer .
-markdown-viewer ~/projects/my-repo
+viewmd .
+viewmd ~/projects/my-repo
 ```
 
 ## Keyboard Shortcuts
