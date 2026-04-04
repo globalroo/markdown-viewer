@@ -227,6 +227,8 @@ export function MarkdownPreview() {
       const max = scrollHeight - clientHeight;
       setScrollProgress(max > 0 ? scrollTop / max : 0);
     };
+    // Initialize from current scroll position (e.g. returning from edit mode)
+    updateProgress();
     el.addEventListener("scroll", updateProgress, { passive: true });
     // Observe the content child for reflows from width/height/font changes
     const content = el.querySelector(".preview-content");
