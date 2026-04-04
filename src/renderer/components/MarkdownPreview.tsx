@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
+import { RevealIcon } from "./Icons";
 import hljs from "highlight.js/lib/core";
 import { useAppStore } from "../store";
 
@@ -184,7 +185,7 @@ export function MarkdownPreview() {
           aria-label={revealLabel}
           title={revealLabel}
         >
-          ↗
+          <RevealIcon />
         </button>
       </div>
       <div

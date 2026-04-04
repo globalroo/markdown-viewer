@@ -2,8 +2,10 @@ import { useEffect } from "react";
 import { Sidebar } from "./components/Sidebar";
 import { MarkdownPreview } from "./components/MarkdownPreview";
 import { Toolbar } from "./components/Toolbar";
+import { Settings } from "./components/Settings";
 import { useAppStore } from "./store";
 import "./styles/app.css";
+import "./styles/themes.css";
 import "highlight.js/styles/github.css";
 
 function useKeyboardShortcuts() {
@@ -13,6 +15,7 @@ function useKeyboardShortcuts() {
     resetFontSize,
     toggleTheme,
     toggleSidebar,
+    toggleSettings,
   } = useAppStore();
 
   useEffect(() => {
@@ -44,6 +47,10 @@ function useKeyboardShortcuts() {
           e.preventDefault();
           toggleSidebar();
           break;
+        case ",":
+          e.preventDefault();
+          toggleSettings();
+          break;
         case "o":
           e.preventDefault();
           window.api.openFolder().then((result) => {
@@ -73,17 +80,18 @@ function useKeyboardShortcuts() {
     resetFontSize,
     toggleTheme,
     toggleSidebar,
+    toggleSettings,
   ]);
 }
 
-function useTheme() {
+function useThemeAndFont() {
   const theme = useAppStore((s) => s.theme);
+  const font = useAppStore((s) => s.font);
 
   useEffect(() => {
     const root = document.documentElement;
 
     if (theme === "system") {
-      root.removeAttribute("data-theme");
       const mq = window.matchMedia("(prefers-color-scheme: dark)");
       const apply = () => {
         root.setAttribute("data-theme", mq.matches ? "dark" : "light");
@@ -95,6 +103,10 @@ function useTheme() {
 
     root.setAttribute("data-theme", theme);
   }, [theme]);
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-font", font);
+  }, [font]);
 }
 
 function useFileAssociation() {
@@ -122,7 +134,7 @@ function useFileAssociation() {
 
 export function App() {
   useKeyboardShortcuts();
-  useTheme();
+  useThemeAndFont();
   useFileAssociation();
 
   return (
@@ -134,6 +146,7 @@ export function App() {
           <MarkdownPreview />
         </main>
       </div>
+      <Settings />
     </div>
   );
 }

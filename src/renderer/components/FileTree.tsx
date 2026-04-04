@@ -1,5 +1,6 @@
 import { useAppStore } from "../store";
 import { useCallback, useMemo } from "react";
+import { ChevronIcon, FolderIcon, FileIcon } from "./Icons";
 
 function filterTree(nodes: TreeNode[], query: string): TreeNode[] {
   if (!query) return nodes;
@@ -44,8 +45,19 @@ function TreeItem({ node, depth }: { node: TreeNode; depth: number }) {
         title={node.path}
       >
         <span className="tree-icon">
-          {node.type === "directory" ? (isExpanded ? "▼" : "▶") : "📄"}
+          {node.type === "directory" ? (
+            <>
+              <ChevronIcon expanded={isExpanded} />
+            </>
+          ) : (
+            <FileIcon />
+          )}
         </span>
+        {node.type === "directory" && (
+          <span className="tree-icon-secondary">
+            <FolderIcon open={isExpanded} />
+          </span>
+        )}
         <span className="tree-label">{node.name}</span>
       </button>
       {node.type === "directory" && isExpanded && node.children && (
