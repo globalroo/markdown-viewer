@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.4.0] - 2026-04-04
+
+### Added
+
+- **Reading comfort themes** — Sepia (warm parchment), Sage (light green, backed by 2025 peer-reviewed study), Twilight Reader (warm dark). All WCAG AA contrast verified.
+- **Typography controls** — adjustable line width (Narrow/Standard/Wide) and line spacing (Compact/Optimal/Relaxed) in Settings.
+- **Focus mode** — `Cmd/Ctrl+Shift+F` hides all chrome for distraction-free reading. Escape to exit.
+- **Warm filter** — subtle sepia CSS filter toggle for evening reading. Reduces blue light.
+- **Reading progress bar** — thin compositor-friendly bar tracking scroll position. Hidden in edit mode and focus mode.
+- 20 new unit tests + 8 new E2E tests (133 total).
+
+### Fixed
+
+- Settings dialog scroll jank on Intel Mac — removed `backdrop-filter: blur()`, added `contain: paint` for compositor-isolated scrolling.
+- Progress bar re-derives position correctly when exiting edit mode.
+
 ## [1.3.1] - 2026-04-04
 
 ### Added
