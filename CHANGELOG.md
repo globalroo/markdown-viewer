@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.3.1] - 2026-04-04
+
+### Added
+
+- **File count badges** — each folder in the file tree shows a pill badge with the total number of markdown files it contains (including nested subdirectories). Count is stable during search filtering and memoized for performance.
+
 ## [1.3.0] - 2026-04-04
 
 ### Added
