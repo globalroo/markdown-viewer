@@ -1,4 +1,8 @@
-# viewmd
+<p align="center">
+  <img src="build/icon.png" alt="viewmd" width="128" height="128">
+</p>
+
+<h1 align="center">viewmd</h1>
 
 A fast, cross-platform desktop app for discovering and reading markdown files in repositories and project directories.
 
