@@ -24,7 +24,7 @@ Please include:
 - **Why** — what problem does it solve? What's your use case?
 - **Alternatives considered** — have you tried workarounds?
 
-We use Gestalt multi-agent review for feature planning, so well-described requests help us ideate effectively.
+Well-described requests help us plan and prioritise effectively.
 
 ## Submitting Changes
 
@@ -129,7 +129,7 @@ Key patterns:
 
 ## Review Process
 
-Significant changes go through Gestalt multi-agent review (Claude, Gemini, Codex) with up to 3 rounds before merging. This is handled by the maintainers — you don't need to run Gestalt yourself.
+Significant changes go through multi-agent AI review (up to 3 rounds) before merging. This is handled by the maintainers.
 
 ## License
 
