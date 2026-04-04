@@ -1,12 +1,12 @@
 <p align="center">
   <img src="build/icon.png" alt="viewmd" width="128" height="128">
+  <br><br>
+  <strong>viewmd</strong>
+  <br>
+  A fast, cross-platform desktop app for discovering and reading markdown files in repositories and project directories.
+  <br><br>
+  Open any folder, instantly see every markdown file in a searchable tree, and read them with clean typography, syntax-highlighted code blocks, and light/dark theming.
 </p>
-
-<h1 align="center">viewmd</h1>
-
-A fast, cross-platform desktop app for discovering and reading markdown files in repositories and project directories.
-
-Open any folder, instantly see every markdown file in a searchable tree, and read them with clean typography, syntax-highlighted code blocks, and light/dark theming.
 
 ## Features
 
