@@ -288,18 +288,27 @@ ipcMain.handle("get-initial-path", async () => {
   return result;
 });
 
+// Find the first real file/directory path in an argv slice, skipping Chromium flags.
+// cwd overrides path.resolve base for relative args (used by second-instance).
+function findPathArg(args: string[], cwd?: string): string | null {
+  for (const arg of args) {
+    // Skip Chromium flags (--flag=value) but not filenames that start with -
+    if (arg.startsWith("--")) continue;
+    const target = cwd ? path.resolve(cwd, arg) : path.resolve(arg);
+    try {
+      const stat = fs.statSync(target);
+      if (stat.isDirectory() || stat.isFile()) return target;
+    } catch {
+      // not a valid path — try next arg
+    }
+  }
+  return null;
+}
+
 // Handle CLI arguments — accept a directory or file path
 function getInitialPath(): string | null {
   const args = process.argv.slice(app.isPackaged ? 1 : 2);
-  if (args.length === 0) return null;
-  const target = path.resolve(args[0]);
-  try {
-    const stat = fs.statSync(target);
-    if (stat.isDirectory() || stat.isFile()) return target;
-  } catch {
-    // path doesn't exist
-  }
-  return null;
+  return findPathArg(args);
 }
 
 // Handle file opened via file association (macOS)
@@ -320,6 +329,39 @@ app.on("open-file", (_event, filePath) => {
 protocol.registerSchemesAsPrivileged([
   { scheme: "local-img", privileges: { bypassCSP: false, supportFetchAPI: true, stream: true } },
 ]);
+
+// Single instance lock — forward args from second launch to existing window
+const gotLock = app.requestSingleInstanceLock();
+if (!gotLock) {
+  app.quit();
+} else {
+  app.on("second-instance", (_event, argv, workingDirectory) => {
+    // argv: [electron, main.js, ...userArgs] when packaged: [binary, ...userArgs]
+    // Chromium may inject flags like --original-process-start-time, so find the first real path.
+    // Resolve relative paths against the second instance's working directory, not ours.
+    const args = argv.slice(app.isPackaged ? 1 : 2);
+    const target = findPathArg(args, workingDirectory);
+    if (target && mainWindow) {
+      try {
+        const stat = fs.statSync(target);
+        const dirPath = stat.isDirectory() ? target : path.dirname(target);
+        addAllowedRoot(dirPath);
+        if (stat.isDirectory()) {
+          mainWindow.webContents.send("open-directory", target);
+        } else {
+          mainWindow.webContents.send("file-opened", target);
+        }
+      } catch {
+        // invalid path — ignore
+      }
+    }
+    // Bring existing window to front
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+    }
+  });
+}
 
 app.whenReady().then(() => {
   protocol.handle("local-img", (request) => {

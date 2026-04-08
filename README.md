@@ -80,21 +80,35 @@ npx electron-builder --linux
 
 The packaged app will be in the `release/` directory.
 
-### Global CLI Access
+### Install & Global CLI Access
 
-Launch viewmd from any terminal to open a folder of markdown files.
+After building or downloading a release, install the app and set up the `viewmd` command so you can open folders from any terminal.
 
-**macOS** — create a CLI wrapper (works with any shell):
+**macOS** — install the app, then create a CLI wrapper:
 
 ```bash
-sudo tee /usr/local/bin/viewmd > /dev/null << 'EOF'
+# Install (from a local build)
+cp -R release/mac/viewmd.app /Applications/
+
+# Create the CLI command
+sudo tee /usr/local/bin/viewmd > /dev/null << 'SCRIPT'
 #!/bin/bash
-open -a viewmd --args "$@"
-EOF
+# Resolve relative paths to absolute (open -a changes CWD to /)
+args=()
+for arg in "$@"; do
+  if [ -e "$arg" ]; then
+    args+=("$(cd "$(dirname "$arg")" && pwd)/$(basename "$arg")")
+  else
+    args+=("$arg")
+  fi
+done
+exec /Applications/viewmd.app/Contents/MacOS/viewmd "${args[@]}" &>/dev/null &
+disown
+SCRIPT
 sudo chmod +x /usr/local/bin/viewmd
 ```
 
-**Windows** — create `viewmd.cmd` somewhere in your PATH:
+**Windows** — run the `.exe` installer, then create `viewmd.cmd` somewhere in your PATH:
 
 ```cmd
 @echo off
@@ -104,7 +118,7 @@ start "" "%LOCALAPPDATA%\Programs\viewmd\viewmd.exe" %*
 **Linux** — if using the AppImage:
 
 ```bash
-sudo ln -sf /path/to/viewmd-1.4.1.AppImage /usr/local/bin/viewmd
+sudo ln -sf /path/to/viewmd-*.AppImage /usr/local/bin/viewmd
 ```
 
 Or if using the `.deb` package, `viewmd` should already be in your PATH.
@@ -112,9 +126,12 @@ Or if using the `.deb` package, `viewmd` should already be in your PATH.
 Then open any directory:
 
 ```bash
-viewmd .
-viewmd ~/projects/my-repo
+viewmd .                      # current directory
+viewmd ~/projects/my-repo     # specific directory
+viewmd README.md              # specific file
 ```
+
+If viewmd is already running, a second `viewmd .` adds the folder to the existing sidebar rather than opening a new window.
 
 ## Keyboard Shortcuts
 

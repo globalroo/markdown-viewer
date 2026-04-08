@@ -1024,6 +1024,50 @@ test("launching with a directory argument opens that folder in sidebar", async (
 // 41. CLI file argument — launching with a file path opens parent dir + selects file
 // ---------------------------------------------------------------------------
 
+test("second launch with different directory adds folder to existing sidebar", async () => {
+  // Close the default app from beforeEach
+  const pid = app.process().pid;
+  if (pid) process.kill(pid, "SIGKILL");
+
+  // Create a second temp directory with its own markdown file
+  const secondDir = fs.mkdtempSync(path.join(os.tmpdir(), "viewmd-e2e-2nd-"));
+  fs.writeFileSync(path.join(secondDir, "second.md"), "# Second\n\nFrom second dir.");
+
+  try {
+    // Launch first instance with testDir
+    app = await electron.launch({ args: ["dist/main/main.js", testDir] });
+    page = await app.firstWindow();
+    await page.waitForLoadState("domcontentloaded");
+    page.on("dialog", (dialog) => dialog.dismiss().catch(() => {}));
+    await page.waitForSelector(".file-tree", { timeout: 5000 });
+
+    // Verify first directory's files are visible
+    await expect(page.locator(".tree-label").filter({ hasText: "README.md" })).toBeVisible();
+
+    // Simulate a second instance launching with secondDir as argument.
+    // Include Chromium-injected flags to verify they are skipped by findPathArg.
+    // argv format for non-packaged: [electron, main.js, ...chromiumFlags, userPath]
+    await app.evaluate(async ({ app: electronApp }, dirPath) => {
+      electronApp.emit("second-instance", {}, [
+        process.execPath,
+        "dist/main/main.js",
+        "--original-process-start-time=12345",
+        "--flag-switches-begin",
+        "--flag-switches-end",
+        dirPath,
+      ], process.cwd());
+    }, secondDir);
+
+    // Wait for the second folder's file to appear
+    await expect(page.locator(".tree-label").filter({ hasText: "second.md" })).toBeVisible({ timeout: 5000 });
+
+    // Both folders should be visible in the sidebar
+    await expect(page.locator(".tree-label").filter({ hasText: "README.md" })).toBeVisible();
+  } finally {
+    fs.rmSync(secondDir, { recursive: true, force: true });
+  }
+});
+
 test("launching with a file argument opens its parent directory and selects the file", async () => {
   // Close the default app from beforeEach
   const pid = app.process().pid;
