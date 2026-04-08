@@ -37,6 +37,9 @@ const api = {
   removeRoot: (rootPath: string): Promise<void> =>
     ipcRenderer.invoke("remove-root", rootPath),
 
+  getInitialPath: (): Promise<string | null> =>
+    ipcRenderer.invoke("get-initial-path"),
+
   onFileOpened: (callback: (filePath: string) => void) => {
     const handler = (_event: Electron.IpcRendererEvent, filePath: string) =>
       callback(filePath);

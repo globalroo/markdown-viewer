@@ -19,6 +19,7 @@ interface ElectronAPI {
   moveFile: (sourcePath: string, destDir: string) => Promise<{ newPath: string }>;
   writeFile: (filePath: string, content: string) => Promise<void>;
   removeRoot: (rootPath: string) => Promise<void>;
+  getInitialPath: () => Promise<string | null>;
   onFileOpened: (callback: (filePath: string) => void) => () => void;
   onDirectoryOpened: (callback: (dirPath: string) => void) => () => void;
 }

@@ -1,7 +1,13 @@
 import { useAppStore } from "../store";
 import { FileTree } from "./FileTree";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronIcon, ProjectIcon, AddFolderIcon } from "./Icons";
+
+const SIDEBAR_SIZE_OPTIONS = [
+  ["small", "Small"],
+  ["medium", "Medium"],
+  ["large", "Large"],
+] as const;
 
 const DRAG_MIME = "application/x-viewmd-path";
 
@@ -97,6 +103,138 @@ function ProjectSection({ project }: { project: { id: string; rootPath: string; 
   );
 }
 
+function SidebarResizeHandle() {
+  const startXRef = useRef(0);
+  const startWidthRef = useRef(0);
+  const { setSidebarWidth, resetSidebarWidth, sidebarWidth } = useAppStore();
+
+  const handlePointerDown = useCallback((e: React.PointerEvent) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    startXRef.current = e.clientX;
+    startWidthRef.current = useAppStore.getState().sidebarWidth;
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  }, []);
+
+  const handlePointerMove = useCallback((e: React.PointerEvent) => {
+    if (!(e.target as HTMLElement).hasPointerCapture(e.pointerId)) return;
+    const delta = e.clientX - startXRef.current;
+    const next = Math.min(500, Math.max(180, startWidthRef.current + delta));
+    document.documentElement.style.setProperty("--sidebar-width", `${next}px`);
+  }, []);
+
+  const handlePointerUp = useCallback((e: React.PointerEvent) => {
+    if (!(e.target as HTMLElement).hasPointerCapture(e.pointerId)) return;
+    (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+    document.body.style.cursor = "";
+    document.body.style.userSelect = "";
+    const delta = e.clientX - startXRef.current;
+    const next = Math.min(500, Math.max(180, startWidthRef.current + delta));
+    setSidebarWidth(next);
+  }, [setSidebarWidth]);
+
+  const handleDoubleClick = useCallback(() => {
+    resetSidebarWidth();
+  }, [resetSidebarWidth]);
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    const store = useAppStore.getState();
+    let next: number | null = null;
+    if (e.key === "ArrowLeft") next = store.sidebarWidth - 10;
+    else if (e.key === "ArrowRight") next = store.sidebarWidth + 10;
+    else if (e.key === "Home") next = 180;
+    else if (e.key === "End") next = 500;
+    if (next !== null) {
+      e.preventDefault();
+      setSidebarWidth(next);
+    }
+  }, [setSidebarWidth]);
+
+  return (
+    <div
+      className="sidebar-resize-handle"
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
+      onDoubleClick={handleDoubleClick}
+      onKeyDown={handleKeyDown}
+      role="separator"
+      aria-orientation="vertical"
+      aria-valuenow={sidebarWidth}
+      aria-valuemin={180}
+      aria-valuemax={500}
+      aria-label="Resize sidebar"
+      tabIndex={0}
+    />
+  );
+}
+
+function SidebarTextSizeButton() {
+  const [open, setOpen] = useState(false);
+  const { sidebarFontSize, setSidebarFontSize } = useAppStore();
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const popRef = useRef<HTMLDivElement>(null);
+
+  const toggle = useCallback(() => setOpen((o) => !o), []);
+
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: MouseEvent) => {
+      if (popRef.current?.contains(e.target as Node)) return;
+      if (btnRef.current?.contains(e.target as Node)) return;
+      setOpen(false);
+    };
+    const esc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("mousedown", close);
+    window.addEventListener("keydown", esc);
+    return () => {
+      window.removeEventListener("mousedown", close);
+      window.removeEventListener("keydown", esc);
+    };
+  }, [open]);
+
+  // Compute fixed position so the popover escapes sidebar's overflow:hidden
+  const popStyle = (() => {
+    if (!open || !btnRef.current) return {};
+    const rect = btnRef.current.getBoundingClientRect();
+    return { position: "fixed" as const, top: rect.bottom + 4, left: rect.left, zIndex: 50 };
+  })();
+
+  return (
+    <div className="sidebar-text-size-anchor">
+      <button
+        ref={btnRef}
+        className="sidebar-text-size-btn"
+        onClick={toggle}
+        aria-label="Sidebar text size"
+        aria-expanded={open}
+        title="Sidebar text size"
+      >
+        Aa
+      </button>
+      {open && (
+        <div ref={popRef} className="sidebar-text-popover" style={popStyle} role="menu">
+          {SIDEBAR_SIZE_OPTIONS.map(([id, label]) => (
+            <button
+              key={id}
+              className={`toolbar-popover-item ${sidebarFontSize === id ? "active" : ""}`}
+              onClick={() => { setSidebarFontSize(id); setOpen(false); }}
+              role="menuitem"
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function Sidebar() {
   const { projects, searchQuery, setSearchQuery, sidebarVisible } = useAppStore();
 
@@ -115,6 +253,7 @@ export function Sidebar() {
         <button className="open-folder-btn" onClick={handleAddFolder} title="Add Project Folder">
           <AddFolderIcon /> Add Folder
         </button>
+        <SidebarTextSizeButton />
       </div>
 
       {projects.length > 0 && (
@@ -155,6 +294,7 @@ export function Sidebar() {
           </div>
         )}
       </div>
+      <SidebarResizeHandle />
     </aside>
   );
 }

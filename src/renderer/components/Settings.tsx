@@ -2,7 +2,7 @@ import { useEffect, useRef, useCallback } from "react";
 import { useAppStore, THEMES, FONTS, type ThemeId, type FontId } from "../store";
 
 export function Settings() {
-  const { theme, setTheme, font, setFont, contentWidth, setContentWidth, lineHeight, setLineHeight, warmFilter, toggleWarmFilter, settingsOpen, toggleSettings } =
+  const { theme, setTheme, font, setFont, contentWidth, setContentWidth, lineHeight, setLineHeight, warmFilter, toggleWarmFilter, sidebarFontSize, setSidebarFontSize, settingsOpen, toggleSettings } =
     useAppStore();
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -127,11 +127,25 @@ export function Settings() {
           </section>
 
           <section className="settings-section">
-            <h3>Reading Layout</h3>
+            <h3>Layout</h3>
+
+            <div className="settings-group-label">Sidebar Text</div>
+            <div className="segmented-control" role="group" aria-label="Sidebar text size">
+              {([["small", "Small"], ["medium", "Medium"], ["large", "Large"]] as const).map(([id, label]) => (
+                <button
+                  key={id}
+                  className={`segmented-btn ${sidebarFontSize === id ? "active" : ""}`}
+                  onClick={() => setSidebarFontSize(id)}
+                  aria-pressed={sidebarFontSize === id}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
 
             <div className="settings-group-label">Line Width</div>
             <div className="segmented-control" role="group" aria-label="Line width">
-              {([["narrow", "Narrow"], ["standard", "Standard"], ["wide", "Wide"]] as const).map(([id, label]) => (
+              {([["narrow", "Narrow"], ["standard", "Standard"], ["wide", "Wide"], ["full", "Full"]] as const).map(([id, label]) => (
                 <button
                   key={id}
                   className={`segmented-btn ${contentWidth === id ? "active" : ""}`}

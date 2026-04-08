@@ -163,8 +163,9 @@ function useThemeAndFont() {
   }, [font]);
 }
 
-const WIDTH_MAP = { narrow: "38rem", standard: "44rem", wide: "52rem" };
+const WIDTH_MAP = { narrow: "38rem", standard: "44rem", wide: "52rem", full: "none" };
 const HEIGHT_MAP = { compact: "1.35", optimal: "1.45", relaxed: "1.55" };
+const SIDEBAR_FONT_BASE = { small: 12, medium: 13, large: 15 };
 
 function useReadingComfort() {
   const contentWidth = useAppStore((s) => s.contentWidth);
@@ -187,6 +188,22 @@ function useReadingComfort() {
   }, [warmFilter]);
 }
 
+function useSidebarLayout() {
+  const sidebarWidth = useAppStore((s) => s.sidebarWidth);
+  const sidebarFontSize = useAppStore((s) => s.sidebarFontSize);
+  const fontSize = useAppStore((s) => s.fontSize);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    root.style.setProperty("--sidebar-width", `${sidebarWidth}px`);
+    const zoomFactor = fontSize / 16;
+    // Compute small base, then ensure medium and large are always distinct
+    const smallPx = Math.max(9, Math.round(SIDEBAR_FONT_BASE.small * zoomFactor));
+    const sizes = { small: smallPx, medium: smallPx + 1, large: smallPx + 3 };
+    root.style.setProperty("--sidebar-font-size", `${sizes[sidebarFontSize]}px`);
+  }, [sidebarWidth, sidebarFontSize, fontSize]);
+}
+
 function useFileAssociation() {
   useEffect(() => {
     const unsubFile = window.api.onFileOpened(async (filePath) => {
@@ -203,6 +220,24 @@ function useFileAssociation() {
       store.addProject(dirPath, tree);
     });
 
+    // Pull initial CLI path after mount (avoids race with push-based IPC)
+    window.api.getInitialPath().then(async (targetPath) => {
+      if (!targetPath) return;
+      const store = useAppStore.getState();
+      try {
+        const tree = await window.api.scanDirectory(targetPath);
+        store.addProject(targetPath, tree);
+      } catch {
+        // targetPath might be a file, not a directory
+        const dirPath = targetPath.replace(/[/\\][^/\\]+$/, "");
+        const tree = await window.api.scanDirectory(dirPath);
+        store.addProject(dirPath, tree);
+        store.selectFile(targetPath);
+      }
+    }).catch(() => {
+      // Initial path unavailable or inaccessible — silently ignore
+    });
+
     return () => {
       unsubFile();
       unsubDir();
@@ -214,6 +249,7 @@ export function App() {
   useKeyboardShortcuts();
   useThemeAndFont();
   useReadingComfort();
+  useSidebarLayout();
   useFileAssociation();
 
   const focusMode = useAppStore((s) => s.focusMode);

@@ -102,12 +102,53 @@ body {
   -webkit-app-region: no-drag;
 }
 
+/* Toolbar popover */
+.toolbar-popover-anchor {
+  -webkit-app-region: no-drag;
+  position: relative;
+}
+
+.toolbar-popover {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+  background: var(--bg-app);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 4px 0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  min-width: 120px;
+  z-index: 50;
+}
+
+.toolbar-popover-item {
+  display: block;
+  width: 100%;
+  padding: 6px 16px;
+  background: none;
+  border: none;
+  font-size: 13px;
+  color: var(--text-primary);
+  cursor: pointer;
+  text-align: left;
+}
+
+.toolbar-popover-item:hover {
+  background: var(--bg-hover);
+}
+
+.toolbar-popover-item.active {
+  font-weight: 500;
+  color: var(--accent, var(--text-primary));
+}
+
 /* ========================================
    Sidebar
    ======================================== */
 
 .sidebar {
-  width: 280px;
+  width: var(--sidebar-width, 280px);
   min-width: 180px;
   max-width: 500px;
   background: var(--bg-sidebar);
@@ -115,12 +156,51 @@ body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  position: relative;
+  flex-shrink: 0;
 }
 
 .sidebar-header {
   padding: 8px;
   border-bottom: 1px solid var(--border-color);
+  display: flex;
+  gap: 6px;
+  align-items: stretch;
 }
+
+.sidebar-text-size-anchor {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.sidebar-text-size-btn {
+  height: 100%;
+  padding: 0 10px;
+  background: none;
+  border: 1px dashed var(--border-color);
+  border-radius: 8px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.sidebar-text-size-btn:hover {
+  border-color: var(--border-focus);
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+.sidebar-text-popover {
+  background: var(--bg-app);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 4px 0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  min-width: 120px;
+}
+
 
 .open-folder-btn {
   width: 100%;
@@ -129,7 +209,7 @@ body {
   border: 1px dashed var(--border-color);
   border-radius: 8px;
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: var(--sidebar-font-size, 13px);
   cursor: pointer;
   text-align: left;
   transition: background 0.15s, color 0.15s;
@@ -155,7 +235,7 @@ body {
   background: var(--bg-input);
   border: 1px solid var(--border-color);
   border-radius: 6px;
-  font-size: 13px;
+  font-size: var(--sidebar-font-size, 13px);
   color: var(--text-primary);
   outline: none;
   transition: border-color 0.15s;
@@ -202,12 +282,12 @@ body {
   padding: 24px;
   text-align: center;
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: var(--sidebar-font-size, 13px);
 }
 
 .shortcut-hint {
   margin-top: 8px;
-  font-size: 12px;
+  font-size: calc(var(--sidebar-font-size, 13px) - 1px);
   opacity: 0.7;
 }
 
@@ -240,7 +320,7 @@ body {
   padding: 8px 12px;
   background: none;
   border: none;
-  font-size: 13px;
+  font-size: var(--sidebar-font-size, 13px);
   font-weight: 600;
   color: var(--text-primary);
   cursor: pointer;
@@ -297,7 +377,7 @@ body {
   padding: 4px 12px;
   background: none;
   border: none;
-  font-size: 13px;
+  font-size: var(--sidebar-font-size, 13px);
   color: var(--text-primary);
   cursor: pointer;
   text-align: left;
@@ -345,7 +425,7 @@ body {
   padding: 16px;
   text-align: center;
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: var(--sidebar-font-size, 13px);
 }
 
 /* ========================================
@@ -610,6 +690,42 @@ body {
 
 .sidebar-content::-webkit-scrollbar-thumb {
   background: var(--scrollbar-thumb);
+}
+
+/* Sidebar resize handle */
+.sidebar-resize-handle {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 10;
+  touch-action: none;
+}
+
+.sidebar-resize-handle::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 2px;
+  width: 2px;
+  height: 100%;
+  background: transparent;
+  transition: background 0.15s;
+}
+
+.sidebar-resize-handle:hover::after,
+.sidebar-resize-handle:active::after {
+  background: var(--accent, var(--border-focus));
+}
+
+.sidebar-resize-handle:focus-visible {
+  outline: none;
+}
+
+.sidebar-resize-handle:focus-visible::after {
+  background: var(--accent, var(--border-focus));
 }
 
 /* ========================================
@@ -1314,8 +1430,8 @@ body {
 .tree-count-badge {
   margin-left: auto;
   padding: 0 6px;
-  font-size: 11px;
-  line-height: 18px;
+  font-size: calc(var(--sidebar-font-size, 13px) - 2px);
+  line-height: 1.6;
   border-radius: 9px;
   background: var(--bg-hover);
   color: var(--text-muted);
@@ -1346,7 +1462,7 @@ body {
   padding: 6px 16px;
   background: none;
   border: none;
-  font-size: 13px;
+  font-size: var(--sidebar-font-size, 13px);
   color: var(--text-primary);
   cursor: pointer;
   text-align: left;
@@ -1365,7 +1481,7 @@ body {
 .tree-rename-input {
   width: 100%;
   padding: 1px 4px;
-  font-size: 13px;
+  font-size: var(--sidebar-font-size, 13px);
   background: var(--bg-app);
   border: 1px solid var(--border-focus, var(--border-color));
   border-radius: 4px;

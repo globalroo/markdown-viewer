@@ -815,3 +815,494 @@ test("printing from edit mode shows preview content", async () => {
   // Textarea should be hidden
   await expect(page.locator(".edit-textarea")).toBeHidden();
 });
+
+// ---------------------------------------------------------------------------
+// 33. Sidebar resize handle exists and is accessible
+// ---------------------------------------------------------------------------
+
+test("sidebar resize handle exists and is accessible", async () => {
+  const handle = page.locator(".sidebar-resize-handle");
+  await expect(handle).toBeVisible();
+
+  await expect(handle).toHaveAttribute("role", "separator");
+  await expect(handle).toHaveAttribute("aria-orientation", "vertical");
+  await expect(handle).toHaveAttribute("aria-valuemin", "180");
+  await expect(handle).toHaveAttribute("aria-valuemax", "500");
+  await expect(handle).toHaveAttribute("aria-valuenow", "280");
+  await expect(handle).toHaveAttribute("aria-label", "Resize sidebar");
+});
+
+// ---------------------------------------------------------------------------
+// 34. Sidebar Aa button opens text size popover
+// ---------------------------------------------------------------------------
+
+test("sidebar Aa button opens text size popover", async () => {
+  // Click the Aa button to open the text size popover
+  await page.click(".sidebar-text-size-btn");
+
+  // Popover should appear with Small/Medium/Large options
+  const popover = page.locator(".sidebar-text-popover");
+  await expect(popover).toBeVisible();
+
+  const items = popover.locator(".toolbar-popover-item");
+  await expect(items).toHaveCount(3);
+  await expect(items.nth(0)).toHaveText("Small");
+  await expect(items.nth(1)).toHaveText("Medium");
+  await expect(items.nth(2)).toHaveText("Large");
+
+  // Click "Small" — popover should close
+  await items.nth(0).click();
+  await expect(popover).toBeHidden();
+});
+
+// ---------------------------------------------------------------------------
+// 35. Toolbar content width popover
+// ---------------------------------------------------------------------------
+
+test("toolbar content width popover shows options and Full sets --content-width to none", async () => {
+  // Click the content width toolbar button
+  await page.click('[aria-label="Content width"]');
+
+  // Popover should appear with Narrow/Standard/Wide/Full
+  const popover = page.locator(".toolbar-popover");
+  await expect(popover).toBeVisible();
+
+  const items = popover.locator(".toolbar-popover-item");
+  await expect(items).toHaveCount(4);
+  await expect(items.nth(0)).toHaveText("Narrow");
+  await expect(items.nth(1)).toHaveText("Standard");
+  await expect(items.nth(2)).toHaveText("Wide");
+  await expect(items.nth(3)).toHaveText("Full");
+
+  // Click "Full"
+  await items.nth(3).click();
+
+  // Popover should close
+  await expect(popover).toBeHidden();
+
+  // Verify --content-width CSS variable is "none"
+  const contentWidth = await page.locator("html").evaluate((el) =>
+    el.style.getPropertyValue("--content-width")
+  );
+  expect(contentWidth).toBe("none");
+});
+
+// ---------------------------------------------------------------------------
+// 36. Linked font scaling
+// ---------------------------------------------------------------------------
+
+test("linked font scaling updates sidebar font size CSS variable", async () => {
+  // Read the default --sidebar-font-size
+  const defaultSize = await page.locator("html").evaluate((el) =>
+    el.style.getPropertyValue("--sidebar-font-size")
+  );
+
+  // Increase font with Cmd+=
+  await page.keyboard.press(`${modKey()}+=`);
+
+  // --sidebar-font-size should change from its default value
+  const increasedSize = await page.locator("html").evaluate((el) =>
+    el.style.getPropertyValue("--sidebar-font-size")
+  );
+  expect(increasedSize).not.toBe(defaultSize);
+
+  // Reset with Cmd+0
+  await page.keyboard.press(`${modKey()}+0`);
+
+  // Should return to default
+  const resetSize = await page.locator("html").evaluate((el) =>
+    el.style.getPropertyValue("--sidebar-font-size")
+  );
+  expect(resetSize).toBe(defaultSize);
+});
+
+// ---------------------------------------------------------------------------
+// 37. Settings shows sidebar text and full width controls
+// ---------------------------------------------------------------------------
+
+test("settings shows sidebar text and full width controls", async () => {
+  await page.click('[aria-label="Open settings"]');
+  await expect(page.locator(".settings-panel")).toBeVisible();
+
+  // Scroll to reveal the layout section
+  const body = page.locator(".settings-body");
+  await body.evaluate((el) => el.scrollTop = el.scrollHeight);
+
+  // "Sidebar Text" segmented control with Small/Medium/Large
+  await expect(page.locator('.settings-group-label:text-is("Sidebar Text")')).toBeVisible();
+  const sidebarControl = page.locator('[aria-label="Sidebar text size"]');
+  await expect(sidebarControl.locator('.segmented-btn:text-is("Small")')).toBeVisible();
+  await expect(sidebarControl.locator('.segmented-btn:text-is("Medium")')).toBeVisible();
+  await expect(sidebarControl.locator('.segmented-btn:text-is("Large")')).toBeVisible();
+
+  // "Full" option in line width control
+  await expect(page.locator('.segmented-btn:text-is("Full")')).toBeVisible();
+});
+
+// ---------------------------------------------------------------------------
+// 38. Content width Full option sets max-width none
+// ---------------------------------------------------------------------------
+
+test("content width Full option in settings sets --content-width to none", async () => {
+  await page.click('[aria-label="Open settings"]');
+  await expect(page.locator(".settings-panel")).toBeVisible();
+
+  // Scroll to reveal layout controls
+  const body = page.locator(".settings-body");
+  await body.evaluate((el) => el.scrollTop = el.scrollHeight);
+
+  // Click "Full" in the line width segmented control
+  await page.click('.segmented-btn:text-is("Full")');
+
+  // Verify --content-width CSS variable is "none"
+  const contentWidth = await page.locator("html").evaluate((el) =>
+    el.style.getPropertyValue("--content-width")
+  );
+  expect(contentWidth).toBe("none");
+});
+
+// ---------------------------------------------------------------------------
+// 39. Sidebar resize via keyboard — arrow keys change width
+// ---------------------------------------------------------------------------
+
+test("sidebar resize handle responds to keyboard arrow keys", async () => {
+  const handle = page.locator(".sidebar-resize-handle");
+  await handle.focus();
+
+  // Get initial sidebar width
+  const initialWidth = await page.locator(".sidebar").evaluate((el) =>
+    el.getBoundingClientRect().width
+  );
+
+  // Press ArrowRight to increase width by 10px
+  await page.keyboard.press("ArrowRight");
+
+  const newWidth = await page.locator("html").evaluate((el) =>
+    el.style.getPropertyValue("--sidebar-width")
+  );
+  expect(newWidth).toBe(`${Math.round(initialWidth) + 10}px`);
+
+  // Press ArrowLeft to decrease back
+  await page.keyboard.press("ArrowLeft");
+
+  const restoredWidth = await page.locator("html").evaluate((el) =>
+    el.style.getPropertyValue("--sidebar-width")
+  );
+  expect(restoredWidth).toBe(`${Math.round(initialWidth)}px`);
+});
+
+// ---------------------------------------------------------------------------
+// 40. CLI directory argument — launching with a path opens that folder
+// ---------------------------------------------------------------------------
+
+test("launching with a directory argument opens that folder in sidebar", async () => {
+  // Close the default app from beforeEach
+  const pid = app.process().pid;
+  if (pid) process.kill(pid, "SIGKILL");
+
+  // Launch with testDir as CLI argument
+  app = await electron.launch({ args: ["dist/main/main.js", testDir] });
+  page = await app.firstWindow();
+  await page.waitForLoadState("domcontentloaded");
+  page.on("dialog", (dialog) => dialog.dismiss().catch(() => {}));
+
+  // Wait for the file tree to appear — the directory should auto-open
+  await page.waitForSelector(".file-tree", { timeout: 5000 });
+
+  // Verify files from testDir are visible — full tree, not just one file
+  const treeLabels = page.locator(".tree-label");
+  await expect(treeLabels.filter({ hasText: "README.md" })).toBeVisible();
+  await expect(treeLabels.filter({ hasText: "docs" })).toBeVisible();
+  await expect(treeLabels.filter({ hasText: "long.md" })).toBeVisible();
+
+  // Confirm the "Add Folder" button was NOT clicked — tree appeared via CLI arg alone
+  // (The open-folder-btn exists but should not have been needed)
+  await expect(page.locator(".open-folder-btn")).toBeVisible();
+});
+
+// ---------------------------------------------------------------------------
+// 41. CLI file argument — launching with a file path opens parent dir + selects file
+// ---------------------------------------------------------------------------
+
+test("launching with a file argument opens its parent directory and selects the file", async () => {
+  // Close the default app from beforeEach
+  const pid = app.process().pid;
+  if (pid) process.kill(pid, "SIGKILL");
+
+  // Launch with a specific file path as CLI argument
+  const filePath = path.join(testDir, "README.md");
+  app = await electron.launch({ args: ["dist/main/main.js", filePath] });
+  page = await app.firstWindow();
+  await page.waitForLoadState("domcontentloaded");
+  page.on("dialog", (dialog) => dialog.dismiss().catch(() => {}));
+
+  // Wait for the file tree AND the preview to appear
+  await page.waitForSelector(".file-tree", { timeout: 5000 });
+  await page.waitForSelector(".preview-content", { timeout: 5000 });
+
+  // The tree should show the parent directory's contents
+  const treeLabels = page.locator(".tree-label");
+  await expect(treeLabels.filter({ hasText: "README.md" })).toBeVisible();
+
+  // The file should be selected — preview should show its content
+  await expect(page.locator(".preview-content h1")).toHaveText("Hello World");
+});
+
+// ---------------------------------------------------------------------------
+// 42. Double-click sidebar resize handle resets width to 280px
+// ---------------------------------------------------------------------------
+
+test("double-click sidebar resize handle resets width to 280px", async () => {
+  const handle = page.locator(".sidebar-resize-handle");
+
+  // First change the sidebar width via keyboard
+  await handle.focus();
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("ArrowRight");
+
+  // Verify width is now 310px (280 + 3*10)
+  const widthBefore = await page.locator("html").evaluate((el) =>
+    el.style.getPropertyValue("--sidebar-width")
+  );
+  expect(widthBefore).toBe("310px");
+
+  // Double-click the handle
+  await handle.dblclick();
+
+  // Should reset to 280px
+  const widthAfter = await page.locator("html").evaluate((el) =>
+    el.style.getPropertyValue("--sidebar-width")
+  );
+  expect(widthAfter).toBe("280px");
+});
+
+// ---------------------------------------------------------------------------
+// 43. Sidebar resize Home/End keyboard shortcuts
+// ---------------------------------------------------------------------------
+
+test("sidebar resize handle Home key sets minimum width and End key sets maximum", async () => {
+  const handle = page.locator(".sidebar-resize-handle");
+  await handle.focus();
+
+  // Press Home — should go to minimum (180px)
+  await page.keyboard.press("Home");
+  const minWidth = await page.locator("html").evaluate((el) =>
+    el.style.getPropertyValue("--sidebar-width")
+  );
+  expect(minWidth).toBe("180px");
+
+  // Press End — should go to maximum (500px)
+  await page.keyboard.press("End");
+  const maxWidth = await page.locator("html").evaluate((el) =>
+    el.style.getPropertyValue("--sidebar-width")
+  );
+  expect(maxWidth).toBe("500px");
+});
+
+// ---------------------------------------------------------------------------
+// 44. Content width popover dismisses on Escape
+// ---------------------------------------------------------------------------
+
+test("content width popover dismisses on Escape key", async () => {
+  // Open the content width popover
+  await page.click('[aria-label="Content width"]');
+  const popover = page.locator(".toolbar-popover");
+  await expect(popover).toBeVisible();
+
+  // Press Escape
+  await page.keyboard.press("Escape");
+
+  // Popover should close
+  await expect(popover).toBeHidden();
+});
+
+// ---------------------------------------------------------------------------
+// 45. Content width popover dismisses on click-outside
+// ---------------------------------------------------------------------------
+
+test("content width popover dismisses on click outside", async () => {
+  // Open the content width popover
+  await page.click('[aria-label="Content width"]');
+  const popover = page.locator(".toolbar-popover");
+  await expect(popover).toBeVisible();
+
+  // Click outside the popover — use dispatchEvent to ensure mousedown fires
+  await page.locator(".app-body").dispatchEvent("mousedown");
+
+  // Popover should close
+  await expect(popover).toBeHidden();
+});
+
+// ---------------------------------------------------------------------------
+// 46. Sidebar text size popover dismisses on Escape
+// ---------------------------------------------------------------------------
+
+test("sidebar text size popover dismisses on Escape key", async () => {
+  await page.click(".sidebar-text-size-btn");
+  const popover = page.locator(".sidebar-text-popover");
+  await expect(popover).toBeVisible();
+
+  await page.keyboard.press("Escape");
+
+  await expect(popover).toBeHidden();
+});
+
+// ---------------------------------------------------------------------------
+// 47. Sidebar text size popover dismisses on click-outside
+// ---------------------------------------------------------------------------
+
+test("sidebar text size popover dismisses on click outside", async () => {
+  await page.click(".sidebar-text-size-btn");
+  const popover = page.locator(".sidebar-text-popover");
+  await expect(popover).toBeVisible();
+
+  // Click outside — on the sidebar content area
+  await page.locator(".sidebar-content").click();
+
+  await expect(popover).toBeHidden();
+});
+
+// ---------------------------------------------------------------------------
+// 48. Linked font scaling — exact values at default 16px
+// ---------------------------------------------------------------------------
+
+test("linked font scaling produces exact values at default font size 16px", async () => {
+  // At default fontSize=16, zoomFactor=1.0
+  // small = max(9, round(12 * 1.0)) = 12px
+  // medium = small + 1 = 13px
+  // large = small + 3 = 15px
+
+  // Select "Small" sidebar font
+  await page.click(".sidebar-text-size-btn");
+  const popover = page.locator(".sidebar-text-popover");
+  await expect(popover).toBeVisible();
+  await popover.locator('.toolbar-popover-item:text-is("Small")').click();
+
+  const smallSize = await page.locator("html").evaluate((el) =>
+    el.style.getPropertyValue("--sidebar-font-size")
+  );
+  expect(smallSize).toBe("12px");
+
+  // Select "Medium"
+  await page.click(".sidebar-text-size-btn");
+  await page.locator('.sidebar-text-popover .toolbar-popover-item:text-is("Medium")').click();
+
+  const mediumSize = await page.locator("html").evaluate((el) =>
+    el.style.getPropertyValue("--sidebar-font-size")
+  );
+  expect(mediumSize).toBe("13px");
+
+  // Select "Large"
+  await page.click(".sidebar-text-size-btn");
+  await page.locator('.sidebar-text-popover .toolbar-popover-item:text-is("Large")').click();
+
+  const largeSize = await page.locator("html").evaluate((el) =>
+    el.style.getPropertyValue("--sidebar-font-size")
+  );
+  expect(largeSize).toBe("15px");
+});
+
+// ---------------------------------------------------------------------------
+// 49. Linked font scaling — exact values after Cmd+= (fontSize=18)
+// ---------------------------------------------------------------------------
+
+test("linked font scaling produces correct values after increasing content font size", async () => {
+  // Increase from 16 to 18, zoomFactor = 18/16 = 1.125
+  // small = max(9, round(12 * 1.125)) = round(13.5) = 14
+  // medium = 14 + 1 = 15px
+  // large = 14 + 3 = 17px
+
+  // Ensure focus is on the main app body, not a popover
+  await page.locator(".app").click();
+  await page.keyboard.press(`${modKey()}+=`);
+  await expect(page.locator(".toolbar-label")).toHaveText("18px");
+
+  // Select "Small"
+  await page.click(".sidebar-text-size-btn");
+  await page.locator('.sidebar-text-popover .toolbar-popover-item:text-is("Small")').click();
+
+  const smallSize = await page.locator("html").evaluate((el) =>
+    el.style.getPropertyValue("--sidebar-font-size")
+  );
+  expect(smallSize).toBe("14px");
+
+  // Select "Medium"
+  await page.click(".sidebar-text-size-btn");
+  await page.locator('.sidebar-text-popover .toolbar-popover-item:text-is("Medium")').click();
+
+  const mediumSize = await page.locator("html").evaluate((el) =>
+    el.style.getPropertyValue("--sidebar-font-size")
+  );
+  expect(mediumSize).toBe("15px");
+
+  // Select "Large"
+  await page.click(".sidebar-text-size-btn");
+  await page.locator('.sidebar-text-popover .toolbar-popover-item:text-is("Large")').click();
+
+  const largeSize = await page.locator("html").evaluate((el) =>
+    el.style.getPropertyValue("--sidebar-font-size")
+  );
+  expect(largeSize).toBe("17px");
+
+  // Reset font size
+  await page.keyboard.press(`${modKey()}+0`);
+});
+
+// ---------------------------------------------------------------------------
+// 50. Settings sidebar text control changes --sidebar-font-size CSS variable
+// ---------------------------------------------------------------------------
+
+test("settings sidebar text control changes --sidebar-font-size CSS variable", async () => {
+  await page.click('[aria-label="Open settings"]');
+  await expect(page.locator(".settings-panel")).toBeVisible();
+
+  // Scroll to reveal the layout section
+  const body = page.locator(".settings-body");
+  await body.evaluate((el) => el.scrollTop = el.scrollHeight);
+
+  // Get the initial value (default: medium at 16px = 13px)
+  const initialSize = await page.locator("html").evaluate((el) =>
+    el.style.getPropertyValue("--sidebar-font-size")
+  );
+  expect(initialSize).toBe("13px");
+
+  // Click "Small" in the settings sidebar text control
+  const sidebarControl = page.locator('[aria-label="Sidebar text size"]');
+  await sidebarControl.locator('.segmented-btn:text-is("Small")').click();
+
+  const smallSize = await page.locator("html").evaluate((el) =>
+    el.style.getPropertyValue("--sidebar-font-size")
+  );
+  expect(smallSize).toBe("12px");
+
+  // Click "Large"
+  await sidebarControl.locator('.segmented-btn:text-is("Large")').click();
+
+  const largeSize = await page.locator("html").evaluate((el) =>
+    el.style.getPropertyValue("--sidebar-font-size")
+  );
+  expect(largeSize).toBe("15px");
+});
+
+// ---------------------------------------------------------------------------
+// 51. Sidebar resize handle ARIA valuenow updates on resize
+// ---------------------------------------------------------------------------
+
+test("sidebar resize handle ARIA valuenow updates when width changes", async () => {
+  const handle = page.locator(".sidebar-resize-handle");
+
+  // Default should be 280
+  await expect(handle).toHaveAttribute("aria-valuenow", "280");
+
+  // Change via keyboard
+  await handle.focus();
+  await page.keyboard.press("ArrowRight");
+
+  // Should now be 290
+  await expect(handle).toHaveAttribute("aria-valuenow", "290");
+
+  // Reset
+  await handle.dblclick();
+  await expect(handle).toHaveAttribute("aria-valuenow", "280");
+});

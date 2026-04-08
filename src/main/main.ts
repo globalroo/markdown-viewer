@@ -279,6 +279,15 @@ ipcMain.handle("remove-root", async (_event, rootPath: string) => {
   removeAllowedRoot(rootPath);
 });
 
+// Return the initial CLI path so the renderer can request it after mount
+let initialPathForRenderer: string | null = null;
+
+ipcMain.handle("get-initial-path", async () => {
+  const result = initialPathForRenderer;
+  initialPathForRenderer = null; // consume once
+  return result;
+});
+
 // Handle CLI arguments — accept a directory or file path
 function getInitialPath(): string | null {
   const args = process.argv.slice(app.isPackaged ? 1 : 2);
@@ -304,24 +313,6 @@ app.on("open-file", (_event, filePath) => {
     pendingFilePath = filePath;
   }
 });
-
-function sendInitialPath(targetPath: string): void {
-  if (!mainWindow) return;
-  try {
-    const stat = fs.statSync(targetPath);
-    const dirPath = stat.isDirectory()
-      ? targetPath
-      : path.dirname(targetPath);
-    addAllowedRoot(dirPath);
-    if (stat.isDirectory()) {
-      mainWindow.webContents.send("open-directory", targetPath);
-    } else {
-      mainWindow.webContents.send("file-opened", targetPath);
-    }
-  } catch {
-    // ignore invalid paths
-  }
-}
 
 // Register custom protocol for secure local image loading
 // Images are rewritten to local-img:///<absolute-path> in the renderer,
@@ -359,10 +350,17 @@ app.whenReady().then(() => {
   createWindow();
 
   const initialPath = pendingFilePath || getInitialPath();
-  if (initialPath && mainWindow) {
-    mainWindow.webContents.on("did-finish-load", () => {
-      sendInitialPath(initialPath);
-    });
+  if (initialPath) {
+    // Store for pull-based retrieval by the renderer after mount
+    initialPathForRenderer = initialPath;
+    // Also add to allowed roots immediately so scan-directory works
+    try {
+      const stat = fs.statSync(initialPath);
+      const dirPath = stat.isDirectory() ? initialPath : path.dirname(initialPath);
+      addAllowedRoot(dirPath);
+    } catch {
+      // ignore
+    }
   }
 
   app.on("activate", () => {

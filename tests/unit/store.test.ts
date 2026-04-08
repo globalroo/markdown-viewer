@@ -23,6 +23,8 @@ function resetStore() {
     lineHeight: "optimal",
     focusMode: false,
     warmFilter: false,
+    sidebarFontSize: "medium",
+    sidebarWidth: 280,
   });
   vi.clearAllMocks();
 }
@@ -603,6 +605,12 @@ describe("useAppStore", () => {
 
       expect(useAppStore.getState().contentWidth).toBe("wide");
     });
+
+    it("accepts 'full'", () => {
+      useAppStore.getState().setContentWidth("full");
+
+      expect(useAppStore.getState().contentWidth).toBe("full");
+    });
   });
 
   // ---------------------------------------------------------------
@@ -680,6 +688,216 @@ describe("useAppStore", () => {
       useAppStore.getState().toggleWarmFilter();
 
       expect(useAppStore.getState().warmFilter).toBe(false);
+    });
+  });
+
+  // ---------------------------------------------------------------
+  // sidebarFontSize
+  // ---------------------------------------------------------------
+  describe("sidebarFontSize", () => {
+    it("defaults to 'medium'", () => {
+      expect(useAppStore.getState().sidebarFontSize).toBe("medium");
+    });
+
+    it("setSidebarFontSize changes the value", () => {
+      useAppStore.getState().setSidebarFontSize("large");
+
+      expect(useAppStore.getState().sidebarFontSize).toBe("large");
+    });
+
+    it("accepts 'small'", () => {
+      useAppStore.getState().setSidebarFontSize("small");
+
+      expect(useAppStore.getState().sidebarFontSize).toBe("small");
+    });
+
+    it("accepts 'medium'", () => {
+      useAppStore.getState().setSidebarFontSize("large");
+      useAppStore.getState().setSidebarFontSize("medium");
+
+      expect(useAppStore.getState().sidebarFontSize).toBe("medium");
+    });
+
+    it("accepts 'large'", () => {
+      useAppStore.getState().setSidebarFontSize("large");
+
+      expect(useAppStore.getState().sidebarFontSize).toBe("large");
+    });
+  });
+
+  // ---------------------------------------------------------------
+  // sidebarWidth
+  // ---------------------------------------------------------------
+  describe("sidebarWidth", () => {
+    it("defaults to 280", () => {
+      expect(useAppStore.getState().sidebarWidth).toBe(280);
+    });
+
+    it("setSidebarWidth changes the value", () => {
+      useAppStore.getState().setSidebarWidth(350);
+
+      expect(useAppStore.getState().sidebarWidth).toBe(350);
+    });
+
+    it("clamps to minimum of 180", () => {
+      useAppStore.getState().setSidebarWidth(100);
+
+      expect(useAppStore.getState().sidebarWidth).toBe(180);
+    });
+
+    it("clamps to maximum of 500", () => {
+      useAppStore.getState().setSidebarWidth(600);
+
+      expect(useAppStore.getState().sidebarWidth).toBe(500);
+    });
+
+    it("accepts boundary value 180", () => {
+      useAppStore.getState().setSidebarWidth(180);
+
+      expect(useAppStore.getState().sidebarWidth).toBe(180);
+    });
+
+    it("accepts boundary value 500", () => {
+      useAppStore.getState().setSidebarWidth(500);
+
+      expect(useAppStore.getState().sidebarWidth).toBe(500);
+    });
+
+    it("resetSidebarWidth resets to 280", () => {
+      useAppStore.getState().setSidebarWidth(400);
+      expect(useAppStore.getState().sidebarWidth).toBe(400);
+
+      useAppStore.getState().resetSidebarWidth();
+
+      expect(useAppStore.getState().sidebarWidth).toBe(280);
+    });
+  });
+
+  // ---------------------------------------------------------------
+  // linked sidebar font scaling formula
+  // ---------------------------------------------------------------
+  describe("linked sidebar font scaling", () => {
+    // The formula from App.tsx useSidebarLayout():
+    //   const SIDEBAR_FONT_BASE = { small: 12, medium: 13, large: 15 };
+    //   const zoomFactor = fontSize / 16;
+    //   const smallPx = Math.max(9, Math.round(12 * zoomFactor));
+    //   sizes = { small: smallPx, medium: smallPx + 1, large: smallPx + 3 };
+
+    const SIDEBAR_FONT_BASE = { small: 12, medium: 13, large: 15 };
+
+    function computeSidebarFontSize(
+      fontSize: number,
+      sidebarFontSize: "small" | "medium" | "large"
+    ): number {
+      const zoomFactor = fontSize / 16;
+      const smallPx = Math.max(9, Math.round(SIDEBAR_FONT_BASE.small * zoomFactor));
+      const sizes = { small: smallPx, medium: smallPx + 1, large: smallPx + 3 };
+      return sizes[sidebarFontSize];
+    }
+
+    it("at default 16px: small=12, medium=13, large=15", () => {
+      expect(computeSidebarFontSize(16, "small")).toBe(12);
+      expect(computeSidebarFontSize(16, "medium")).toBe(13);
+      expect(computeSidebarFontSize(16, "large")).toBe(15);
+    });
+
+    it("at 18px (zoom 1.125): small=14, medium=15, large=17", () => {
+      expect(computeSidebarFontSize(18, "small")).toBe(14);
+      expect(computeSidebarFontSize(18, "medium")).toBe(15);
+      expect(computeSidebarFontSize(18, "large")).toBe(17);
+    });
+
+    it("at 10px minimum: small=max(9, round(12*0.625))=max(9,8)=9, medium=10, large=12", () => {
+      expect(computeSidebarFontSize(10, "small")).toBe(9);
+      expect(computeSidebarFontSize(10, "medium")).toBe(10);
+      expect(computeSidebarFontSize(10, "large")).toBe(12);
+    });
+
+    it("at 32px maximum: small=24, medium=25, large=27", () => {
+      expect(computeSidebarFontSize(32, "small")).toBe(24);
+      expect(computeSidebarFontSize(32, "medium")).toBe(25);
+      expect(computeSidebarFontSize(32, "large")).toBe(27);
+    });
+
+    it("medium is always small+1 and large is always small+3", () => {
+      for (const fontSize of [10, 12, 14, 16, 18, 20, 24, 28, 32]) {
+        const small = computeSidebarFontSize(fontSize, "small");
+        const medium = computeSidebarFontSize(fontSize, "medium");
+        const large = computeSidebarFontSize(fontSize, "large");
+        expect(medium).toBe(small + 1);
+        expect(large).toBe(small + 3);
+      }
+    });
+
+    it("small is never below 9px", () => {
+      // Even at the minimum content font size of 10
+      expect(computeSidebarFontSize(10, "small")).toBeGreaterThanOrEqual(9);
+    });
+
+    it("store fontSize increase/decrease affects the formula inputs correctly", () => {
+      // Increase font size from 16 to 18
+      useAppStore.getState().increaseFontSize();
+      expect(useAppStore.getState().fontSize).toBe(18);
+
+      // Verify the formula input
+      expect(computeSidebarFontSize(18, "medium")).toBe(15);
+
+      // Decrease back
+      useAppStore.getState().decreaseFontSize();
+      expect(useAppStore.getState().fontSize).toBe(16);
+      expect(computeSidebarFontSize(16, "medium")).toBe(13);
+    });
+  });
+
+  // ---------------------------------------------------------------
+  // sidebar width and reset interaction
+  // ---------------------------------------------------------------
+  describe("sidebar width reset interaction", () => {
+    it("double-click reset after keyboard resize returns to 280", () => {
+      useAppStore.getState().setSidebarWidth(350);
+      expect(useAppStore.getState().sidebarWidth).toBe(350);
+
+      useAppStore.getState().resetSidebarWidth();
+      expect(useAppStore.getState().sidebarWidth).toBe(280);
+    });
+
+    it("setSidebarWidth with increments of 10 simulates arrow keys", () => {
+      const current = useAppStore.getState().sidebarWidth;
+      useAppStore.getState().setSidebarWidth(current + 10);
+      expect(useAppStore.getState().sidebarWidth).toBe(290);
+
+      useAppStore.getState().setSidebarWidth(290 - 10);
+      expect(useAppStore.getState().sidebarWidth).toBe(280);
+    });
+
+    it("Home key equivalent sets minimum (180)", () => {
+      useAppStore.getState().setSidebarWidth(180);
+      expect(useAppStore.getState().sidebarWidth).toBe(180);
+    });
+
+    it("End key equivalent sets maximum (500)", () => {
+      useAppStore.getState().setSidebarWidth(500);
+      expect(useAppStore.getState().sidebarWidth).toBe(500);
+    });
+  });
+
+  // ---------------------------------------------------------------
+  // contentWidth "full" value
+  // ---------------------------------------------------------------
+  describe("contentWidth full mapping", () => {
+    it("sets to 'full' and store reflects it", () => {
+      useAppStore.getState().setContentWidth("full");
+      expect(useAppStore.getState().contentWidth).toBe("full");
+    });
+
+    it("can round-trip through all values including full", () => {
+      const values: Array<"narrow" | "standard" | "wide" | "full"> = [
+        "narrow", "standard", "wide", "full",
+      ];
+      for (const v of values) {
+        useAppStore.getState().setContentWidth(v);
+        expect(useAppStore.getState().contentWidth).toBe(v);
+      }
     });
   });
 

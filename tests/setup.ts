@@ -10,6 +10,7 @@ const mockApi: Record<string, any> = {
   moveFile: vi.fn().mockResolvedValue({ newPath: "" }),
   writeFile: vi.fn().mockResolvedValue(undefined),
   removeRoot: vi.fn().mockResolvedValue(undefined),
+  getInitialPath: vi.fn().mockResolvedValue(null),
   onFileOpened: vi.fn().mockReturnValue(() => {}),
   onDirectoryOpened: vi.fn().mockReturnValue(() => {}),
 };

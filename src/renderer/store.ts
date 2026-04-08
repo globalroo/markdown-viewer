@@ -89,10 +89,14 @@ interface AppState {
   settingsOpen: boolean;
 
   // Reading comfort
-  contentWidth: "narrow" | "standard" | "wide";
+  contentWidth: "narrow" | "standard" | "wide" | "full";
   lineHeight: "compact" | "optimal" | "relaxed";
   focusMode: boolean;
   warmFilter: boolean;
+
+  // Sidebar layout
+  sidebarFontSize: "small" | "medium" | "large";
+  sidebarWidth: number;
 
   // Edit mode state
   editMode: boolean;
@@ -120,10 +124,15 @@ interface AppState {
   toggleSettings: () => void;
 
   // Reading comfort actions
-  setContentWidth: (width: "narrow" | "standard" | "wide") => void;
+  setContentWidth: (width: "narrow" | "standard" | "wide" | "full") => void;
   setLineHeight: (height: "compact" | "optimal" | "relaxed") => void;
   toggleFocusMode: () => void;
   toggleWarmFilter: () => void;
+
+  // Sidebar layout actions
+  setSidebarFontSize: (size: "small" | "medium" | "large") => void;
+  setSidebarWidth: (width: number) => void;
+  resetSidebarWidth: () => void;
 
   // Edit mode actions
   setEditMode: (mode: boolean) => void;
@@ -152,6 +161,8 @@ export const useAppStore = create<AppState>((set) => ({
   lineHeight: "optimal",
   focusMode: false,
   warmFilter: false,
+  sidebarFontSize: "medium",
+  sidebarWidth: 280,
   editMode: false,
   editContent: "",
   editDirty: false,
@@ -249,6 +260,13 @@ export const useAppStore = create<AppState>((set) => ({
 
   toggleWarmFilter: () =>
     set((state) => ({ warmFilter: !state.warmFilter })),
+
+  setSidebarFontSize: (size) => set({ sidebarFontSize: size }),
+
+  setSidebarWidth: (width) =>
+    set({ sidebarWidth: Math.min(500, Math.max(180, width)) }),
+
+  resetSidebarWidth: () => set({ sidebarWidth: 280 }),
 
   setEditMode: (mode) =>
     set((state) => {
