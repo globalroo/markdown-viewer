@@ -1,5 +1,29 @@
 # Changelog
 
+## [1.5.1] - 2026-04-08
+
+### Added
+
+- **Single-instance CLI** — running `viewmd .` from a second directory adds the folder to the existing sidebar instead of launching a new window. Uses Electron's `requestSingleInstanceLock` with `second-instance` event forwarding.
+- **Robust argv parsing** — `findPathArg()` helper skips Chromium-injected `--flags` and resolves relative paths against the correct working directory.
+- **README install docs** — complete install and CLI setup instructions for macOS, Windows, and Linux.
+
+## [1.5.0] - 2026-04-08
+
+### Added
+
+- **Sidebar font size control** — Small / Medium / Large via `Aa` button in the sidebar header or Settings > Layout. Driven by `--sidebar-font-size` CSS variable.
+- **Resizable sidebar** — drag handle with pointer capture for smooth 60fps resize. Keyboard accessible (Arrow keys for 10px steps, Home/End for min/max). Double-click resets to 280px. Full ARIA `separator` role.
+- **Linked font scaling** — `Cmd/Ctrl+/-` now scales both content and sidebar text proportionally. Sidebar Small/Medium/Large becomes a base density preference; zoom scales on top. Offset-based formula guarantees all three presets remain distinct at every zoom level.
+- **Full-width content** — new "Full" option in content width (toolbar popover or Settings > Layout > Line Width) removes the `max-width` constraint so content fills the pane in full-screen. Print styles unaffected.
+- **Toolbar content width popover** — columns icon button on the toolbar with Narrow / Standard / Wide / Full options.
+- **CLI directory open** — `viewmd .` (or any directory/file path) opens that folder in the sidebar automatically on launch. Pull-based IPC replaces the race-prone push-on-`did-finish-load` pattern.
+- **Comprehensive test coverage** — 134 unit tests + 52 E2E tests covering all new features including resize keyboard/drag, popover dismiss, linked scaling exact values, CLI launch, and second-instance forwarding.
+
+### Changed
+
+- Settings "Reading Layout" section renamed to "Layout" to accommodate sidebar controls alongside content width and line spacing.
+
 ## [1.4.1] - 2026-04-04
 
 ### Added
