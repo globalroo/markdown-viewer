@@ -68,6 +68,11 @@ export const FONTS: FontOption[] = [
   { id: "mono", name: "Monospace", description: "SF Mono — technical" },
 ];
 
+interface OpenTab {
+  filePath: string;
+  scrollPosition: number;
+}
+
 interface Project {
   id: string;
   rootPath: string;
@@ -107,6 +112,20 @@ interface AppState {
   // Rename state
   renamingPath: string | null;
 
+  // Document outline
+  outlineVisible: boolean;
+
+  // Custom CSS
+  customCSSPath: string | null;
+  customCSSContent: string;
+
+  // Tabs
+  openTabs: OpenTab[];
+  activeTab: string | null;
+
+  // Style check
+  styleCheckEnabled: boolean;
+
   addProject: (rootPath: string, tree: TreeNode[]) => void;
   removeProject: (id: string) => void;
   toggleProject: (id: string) => void;
@@ -142,6 +161,21 @@ interface AppState {
   // Rename action
   setRenamingPath: (path: string | null) => void;
 
+  // Document outline actions
+  toggleOutline: () => void;
+
+  // Custom CSS actions
+  setCustomCSS: (path: string | null, content: string) => void;
+  clearCustomCSS: () => void;
+
+  // Tab actions
+  openTab: (filePath: string) => void;
+  closeTab: (filePath: string) => void;
+  setTabScrollPosition: (filePath: string, position: number) => void;
+
+  // Style check actions
+  toggleStyleCheck: () => void;
+
   // Tree mutation after rename/move
   updateProjectTree: (projectId: string, tree: TreeNode[], oldPath?: string, newPath?: string) => void;
 }
@@ -168,6 +202,12 @@ export const useAppStore = create<AppState>((set) => ({
   editDirty: false,
   editFilePath: null,
   renamingPath: null,
+  outlineVisible: true,
+  customCSSPath: null,
+  customCSSContent: "",
+  openTabs: [],
+  activeTab: null,
+  styleCheckEnabled: false,
 
   addProject: (rootPath, tree) =>
     set((state) => {
@@ -194,10 +234,19 @@ export const useAppStore = create<AppState>((set) => ({
         state.selectedFile && state.selectedFile.startsWith(id)
           ? null
           : state.selectedFile;
+      const belongsToProject = (p: string) =>
+        p === id || p.startsWith(id + "/") || p.startsWith(id + "\\");
+      const openTabs = state.openTabs.filter((t) => !belongsToProject(t.filePath));
+      let activeTab = state.activeTab;
+      if (activeTab && belongsToProject(activeTab)) {
+        activeTab = openTabs.length > 0 ? openTabs[0].filePath : null;
+      }
       return {
         projects,
-        selectedFile,
-        markdownContent: selectedFile ? state.markdownContent : "",
+        selectedFile: selectedFile ?? activeTab,
+        markdownContent: selectedFile ?? activeTab ? state.markdownContent : "",
+        openTabs,
+        activeTab,
       };
     }),
 
@@ -219,7 +268,14 @@ export const useAppStore = create<AppState>((set) => ({
       return { expandedDirs: next };
     }),
 
-  selectFile: (filePath) => set({ selectedFile: filePath }),
+  selectFile: (filePath) =>
+    set((state) => ({
+      selectedFile: filePath,
+      activeTab: filePath,
+      openTabs: state.openTabs.some((t) => t.filePath === filePath)
+        ? state.openTabs
+        : [...state.openTabs, { filePath, scrollPosition: 0 }],
+    })),
 
   setMarkdownContent: (content) => set({ markdownContent: content }),
 
@@ -296,6 +352,58 @@ export const useAppStore = create<AppState>((set) => ({
 
   setRenamingPath: (path) => set({ renamingPath: path }),
 
+  toggleOutline: () =>
+    set((state) => ({ outlineVisible: !state.outlineVisible })),
+
+  setCustomCSS: (path, content) =>
+    set({ customCSSPath: path, customCSSContent: content }),
+
+  clearCustomCSS: () =>
+    set({ customCSSPath: null, customCSSContent: "" }),
+
+  openTab: (filePath) =>
+    set((state) => ({
+      activeTab: filePath,
+      selectedFile: filePath,
+      openTabs: state.openTabs.some((t) => t.filePath === filePath)
+        ? state.openTabs
+        : [...state.openTabs, { filePath, scrollPosition: 0 }],
+    })),
+
+  closeTab: (filePath) =>
+    set((state) => {
+      const idx = state.openTabs.findIndex((t) => t.filePath === filePath);
+      if (idx === -1) return state;
+      const openTabs = state.openTabs.filter((t) => t.filePath !== filePath);
+      let activeTab = state.activeTab;
+      let selectedFile = state.selectedFile;
+      if (state.activeTab === filePath) {
+        if (openTabs.length === 0) {
+          activeTab = null;
+          selectedFile = null;
+        } else {
+          activeTab = openTabs[Math.min(idx, openTabs.length - 1)].filePath;
+          selectedFile = activeTab;
+        }
+      }
+      return {
+        openTabs,
+        activeTab,
+        selectedFile,
+        markdownContent: selectedFile ? state.markdownContent : "",
+      };
+    }),
+
+  setTabScrollPosition: (filePath, position) =>
+    set((state) => ({
+      openTabs: state.openTabs.map((t) =>
+        t.filePath === filePath ? { ...t, scrollPosition: position } : t
+      ),
+    })),
+
+  toggleStyleCheck: () =>
+    set((state) => ({ styleCheckEnabled: !state.styleCheckEnabled })),
+
   updateProjectTree: (projectId, tree, oldPath, newPath) =>
     set((state) => {
       const projects = state.projects.map((p) =>
@@ -339,6 +447,24 @@ export const useAppStore = create<AppState>((set) => ({
         }
       }
 
-      return { projects, selectedFile, expandedDirs, editFilePath };
+      // Remap tabs on rename/move
+      let openTabs = state.openTabs;
+      let activeTab = state.activeTab;
+      if (oldPath && newPath) {
+        openTabs = openTabs.map((t) =>
+          t.filePath === oldPath
+            ? { ...t, filePath: newPath }
+            : hasPrefix(t.filePath, oldPath)
+              ? { ...t, filePath: newPath + t.filePath.slice(oldPath.length) }
+              : t
+        );
+        if (activeTab === oldPath) {
+          activeTab = newPath;
+        } else if (activeTab && hasPrefix(activeTab, oldPath)) {
+          activeTab = newPath + activeTab.slice(oldPath.length);
+        }
+      }
+
+      return { projects, selectedFile, expandedDirs, editFilePath, openTabs, activeTab };
     }),
 }));

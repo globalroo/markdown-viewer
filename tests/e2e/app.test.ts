@@ -262,10 +262,10 @@ test("copy button copies raw markdown to clipboard", async () => {
     }
   });
 
-  await page.click(".preview-copy-btn");
+  await page.click('.preview-copy-btn:text-is("Copy")');
 
   // The button should momentarily show "Copied!"
-  await expect(page.locator(".preview-copy-btn")).toHaveText("Copied!");
+  await expect(page.locator('.preview-copy-btn:text-is("Copied!")')).toBeVisible();
 
   // Verify clipboard content via the renderer
   const clipboardText = await page.evaluate(() =>

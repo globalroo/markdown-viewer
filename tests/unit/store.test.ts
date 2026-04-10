@@ -25,6 +25,12 @@ function resetStore() {
     warmFilter: false,
     sidebarFontSize: "medium",
     sidebarWidth: 280,
+    outlineVisible: true,
+    customCSSPath: null,
+    customCSSContent: "",
+    openTabs: [],
+    activeTab: null,
+    styleCheckEnabled: false,
   });
   vi.clearAllMocks();
 }
@@ -921,6 +927,177 @@ describe("useAppStore", () => {
       const twilight = THEMES.find((t) => t.id === "twilight-reader");
       expect(twilight).toBeDefined();
       expect(twilight!.group).toBe("reading");
+    });
+  });
+
+  describe("toggleOutline", () => {
+    it("toggles outlineVisible from true to false", () => {
+      useAppStore.getState().toggleOutline();
+      expect(useAppStore.getState().outlineVisible).toBe(false);
+    });
+
+    it("toggles outlineVisible from false to true", () => {
+      useAppStore.setState({ outlineVisible: false });
+      useAppStore.getState().toggleOutline();
+      expect(useAppStore.getState().outlineVisible).toBe(true);
+    });
+  });
+
+  describe("customCSS", () => {
+    it("setCustomCSS sets both path and content", () => {
+      useAppStore.getState().setCustomCSS("/path/to/theme.css", "body { color: red; }");
+      const state = useAppStore.getState();
+      expect(state.customCSSPath).toBe("/path/to/theme.css");
+      expect(state.customCSSContent).toBe("body { color: red; }");
+    });
+
+    it("clearCustomCSS resets both to null/empty", () => {
+      useAppStore.getState().setCustomCSS("/path/to/theme.css", "body { color: red; }");
+      useAppStore.getState().clearCustomCSS();
+      const state = useAppStore.getState();
+      expect(state.customCSSPath).toBeNull();
+      expect(state.customCSSContent).toBe("");
+    });
+  });
+
+  describe("tabs", () => {
+    it("selectFile opens a tab and sets activeTab", () => {
+      useAppStore.getState().selectFile("/project/readme.md");
+      const state = useAppStore.getState();
+      expect(state.selectedFile).toBe("/project/readme.md");
+      expect(state.activeTab).toBe("/project/readme.md");
+      expect(state.openTabs).toHaveLength(1);
+      expect(state.openTabs[0].filePath).toBe("/project/readme.md");
+      expect(state.openTabs[0].scrollPosition).toBe(0);
+    });
+
+    it("selectFile does not duplicate tabs", () => {
+      useAppStore.getState().selectFile("/project/readme.md");
+      useAppStore.getState().selectFile("/project/readme.md");
+      expect(useAppStore.getState().openTabs).toHaveLength(1);
+    });
+
+    it("selectFile opens multiple tabs for different files", () => {
+      useAppStore.getState().selectFile("/project/readme.md");
+      useAppStore.getState().selectFile("/project/notes.md");
+      const state = useAppStore.getState();
+      expect(state.openTabs).toHaveLength(2);
+      expect(state.activeTab).toBe("/project/notes.md");
+    });
+
+    it("openTab adds to openTabs and sets activeTab", () => {
+      useAppStore.getState().openTab("/project/readme.md");
+      const state = useAppStore.getState();
+      expect(state.activeTab).toBe("/project/readme.md");
+      expect(state.openTabs).toHaveLength(1);
+    });
+
+    it("closeTab removes the tab", () => {
+      useAppStore.getState().selectFile("/project/a.md");
+      useAppStore.getState().selectFile("/project/b.md");
+      useAppStore.getState().closeTab("/project/a.md");
+      const state = useAppStore.getState();
+      expect(state.openTabs).toHaveLength(1);
+      expect(state.openTabs[0].filePath).toBe("/project/b.md");
+    });
+
+    it("closeTab selects adjacent tab when closing active tab", () => {
+      useAppStore.getState().selectFile("/project/a.md");
+      useAppStore.getState().selectFile("/project/b.md");
+      useAppStore.getState().selectFile("/project/c.md");
+      // Active is c.md, close it
+      useAppStore.getState().closeTab("/project/c.md");
+      const state = useAppStore.getState();
+      expect(state.activeTab).toBe("/project/b.md");
+      expect(state.selectedFile).toBe("/project/b.md");
+    });
+
+    it("closeTab clears selection when last tab is closed", () => {
+      useAppStore.getState().selectFile("/project/a.md");
+      useAppStore.getState().closeTab("/project/a.md");
+      const state = useAppStore.getState();
+      expect(state.openTabs).toHaveLength(0);
+      expect(state.activeTab).toBeNull();
+      expect(state.selectedFile).toBeNull();
+    });
+
+    it("closeTab does nothing for unknown file", () => {
+      useAppStore.getState().selectFile("/project/a.md");
+      useAppStore.getState().closeTab("/project/nonexistent.md");
+      expect(useAppStore.getState().openTabs).toHaveLength(1);
+    });
+
+    it("setTabScrollPosition updates scroll position for a tab", () => {
+      useAppStore.getState().selectFile("/project/readme.md");
+      useAppStore.getState().setTabScrollPosition("/project/readme.md", 500);
+      expect(useAppStore.getState().openTabs[0].scrollPosition).toBe(500);
+    });
+
+    it("setTabScrollPosition does not affect other tabs", () => {
+      useAppStore.getState().selectFile("/project/a.md");
+      useAppStore.getState().selectFile("/project/b.md");
+      useAppStore.getState().setTabScrollPosition("/project/a.md", 100);
+      expect(useAppStore.getState().openTabs[1].scrollPosition).toBe(0);
+    });
+  });
+
+  describe("removeProject with tabs", () => {
+    it("removes tabs belonging to the removed project", () => {
+      useAppStore.getState().addProject("/project", []);
+      useAppStore.getState().selectFile("/project/readme.md");
+      useAppStore.getState().selectFile("/project/notes.md");
+      useAppStore.getState().removeProject("/project");
+      expect(useAppStore.getState().openTabs).toHaveLength(0);
+      expect(useAppStore.getState().activeTab).toBeNull();
+    });
+
+    it("preserves tabs from other projects", () => {
+      useAppStore.getState().addProject("/project-a", []);
+      useAppStore.getState().addProject("/project-b", []);
+      useAppStore.getState().selectFile("/project-a/readme.md");
+      useAppStore.getState().selectFile("/project-b/notes.md");
+      useAppStore.getState().removeProject("/project-a");
+      const state = useAppStore.getState();
+      expect(state.openTabs).toHaveLength(1);
+      expect(state.openTabs[0].filePath).toBe("/project-b/notes.md");
+    });
+  });
+
+  describe("updateProjectTree with tabs", () => {
+    it("remaps tab filePaths when a file is renamed", () => {
+      useAppStore.getState().addProject("/project", []);
+      useAppStore.getState().selectFile("/project/old.md");
+      useAppStore.getState().updateProjectTree("/project", [], "/project/old.md", "/project/new.md");
+      const state = useAppStore.getState();
+      expect(state.openTabs[0].filePath).toBe("/project/new.md");
+      expect(state.activeTab).toBe("/project/new.md");
+    });
+
+    it("remaps nested tab paths when a directory is renamed", () => {
+      useAppStore.getState().addProject("/project", []);
+      useAppStore.getState().selectFile("/project/docs/readme.md");
+      useAppStore.getState().updateProjectTree("/project", [], "/project/docs", "/project/notes");
+      expect(useAppStore.getState().openTabs[0].filePath).toBe("/project/notes/readme.md");
+    });
+
+    it("does not remap tabs when no oldPath/newPath provided", () => {
+      useAppStore.getState().addProject("/project", []);
+      useAppStore.getState().selectFile("/project/readme.md");
+      useAppStore.getState().updateProjectTree("/project", []);
+      expect(useAppStore.getState().openTabs[0].filePath).toBe("/project/readme.md");
+    });
+  });
+
+  describe("toggleStyleCheck", () => {
+    it("toggles styleCheckEnabled from false to true", () => {
+      useAppStore.getState().toggleStyleCheck();
+      expect(useAppStore.getState().styleCheckEnabled).toBe(true);
+    });
+
+    it("toggles styleCheckEnabled from true to false", () => {
+      useAppStore.setState({ styleCheckEnabled: true });
+      useAppStore.getState().toggleStyleCheck();
+      expect(useAppStore.getState().styleCheckEnabled).toBe(false);
     });
   });
 });

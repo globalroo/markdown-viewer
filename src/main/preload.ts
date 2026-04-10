@@ -12,6 +12,12 @@ export interface OpenFolderResult {
   tree: TreeNode[];
 }
 
+export interface SearchResult {
+  filePath: string;
+  line: number;
+  text: string;
+}
+
 const api = {
   openFolder: (): Promise<OpenFolderResult | null> =>
     ipcRenderer.invoke("open-folder"),
@@ -40,6 +46,21 @@ const api = {
   getInitialPath: (): Promise<string | null> =>
     ipcRenderer.invoke("get-initial-path"),
 
+  exportHTML: (html: string, css: string, theme?: string, font?: string, rootStyle?: string, warmFilter?: boolean): Promise<void> =>
+    ipcRenderer.invoke("export-html", html, css, theme, font, rootStyle, warmFilter),
+
+  loadCustomCSS: (): Promise<{ path: string; content: string } | null> =>
+    ipcRenderer.invoke("load-custom-css"),
+
+  getCustomCSS: (): Promise<{ path: string; content: string } | null> =>
+    ipcRenderer.invoke("get-custom-css"),
+
+  clearCustomCSS: (): Promise<void> =>
+    ipcRenderer.invoke("clear-custom-css"),
+
+  searchContent: (query: string, roots: string[]): Promise<SearchResult[]> =>
+    ipcRenderer.invoke("search-content", query, roots),
+
   onFileOpened: (callback: (filePath: string) => void) => {
     const handler = (_event: Electron.IpcRendererEvent, filePath: string) =>
       callback(filePath);
@@ -52,6 +73,28 @@ const api = {
       callback(dirPath);
     ipcRenderer.on("open-directory", handler);
     return () => ipcRenderer.removeListener("open-directory", handler);
+  },
+
+  onFileChanged: (callback: (filePath: string, content: string) => void) => {
+    const handler = (
+      _event: Electron.IpcRendererEvent,
+      filePath: string,
+      content: string
+    ) => callback(filePath, content);
+    ipcRenderer.on("file-changed", handler);
+    return () => ipcRenderer.removeListener("file-changed", handler);
+  },
+
+  onTreeChanged: (
+    callback: (rootPath: string, tree: TreeNode[]) => void
+  ) => {
+    const handler = (
+      _event: Electron.IpcRendererEvent,
+      rootPath: string,
+      tree: TreeNode[]
+    ) => callback(rootPath, tree);
+    ipcRenderer.on("tree-changed", handler);
+    return () => ipcRenderer.removeListener("tree-changed", handler);
   },
 };
 

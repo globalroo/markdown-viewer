@@ -1,4 +1,5 @@
 import { useAppStore, THEMES } from "../store";
+import { OutlineIcon } from "./DocumentOutline";
 import { useState, useRef, useEffect, useCallback } from "react";
 
 const isMac = navigator.platform.includes("Mac");
@@ -119,6 +120,9 @@ export function Toolbar() {
     toggleTheme,
     toggleSidebar,
     toggleSettings,
+    toggleOutline,
+    toggleStyleCheck,
+    styleCheckEnabled,
     selectedFile,
   } = useAppStore();
 
@@ -164,14 +168,32 @@ export function Toolbar() {
       </div>
       <ContentWidthPopover />
       {selectedFile && (
-        <button
-          className="toolbar-btn"
-          onClick={() => window.print()}
-          aria-label="Print document"
-          title={`Print rendered markdown (${mod}P)`}
-        >
-          <PrintIcon />
-        </button>
+        <>
+          <button
+            className={`toolbar-btn${styleCheckEnabled ? " style-check-toggle active" : ""}`}
+            onClick={toggleStyleCheck}
+            aria-label={`Style check ${styleCheckEnabled ? "on" : "off"}`}
+            title="Toggle style check"
+          >
+            Style
+          </button>
+          <button
+            className="toolbar-btn"
+            onClick={toggleOutline}
+            aria-label="Toggle document outline"
+            title={`Toggle outline (${mod}Shift+O)`}
+          >
+            <OutlineIcon />
+          </button>
+          <button
+            className="toolbar-btn"
+            onClick={() => window.print()}
+            aria-label="Print document"
+            title={`Print rendered markdown (${mod}P)`}
+          >
+            <PrintIcon />
+          </button>
+        </>
       )}
       <button
         className="toolbar-btn"

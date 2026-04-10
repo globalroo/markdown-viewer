@@ -1,6 +1,8 @@
 import { useEffect } from "react";
 import { Sidebar } from "./components/Sidebar";
 import { MarkdownPreview } from "./components/MarkdownPreview";
+import { DocumentOutline } from "./components/DocumentOutline";
+import { TabBar } from "./components/TabBar";
 import { Toolbar } from "./components/Toolbar";
 import { Settings } from "./components/Settings";
 import { useAppStore } from "./store";
@@ -85,12 +87,18 @@ function useKeyboardShortcuts() {
           toggleSettings();
           break;
         case "o":
-          e.preventDefault();
-          window.api.openFolder().then((result) => {
-            if (result) {
-              useAppStore.getState().addProject(result.rootPath, result.tree);
-            }
-          });
+        case "O":
+          if (e.shiftKey) {
+            e.preventDefault();
+            state.toggleOutline();
+          } else {
+            e.preventDefault();
+            window.api.openFolder().then((result) => {
+              if (result) {
+                useAppStore.getState().addProject(result.rootPath, result.tree);
+              }
+            });
+          }
           break;
         case "p":
           e.preventDefault();
@@ -106,6 +114,12 @@ function useKeyboardShortcuts() {
             const searchInput =
               document.querySelector<HTMLInputElement>(".search-input");
             searchInput?.focus();
+          }
+          break;
+        case "w":
+          if (state.activeTab) {
+            e.preventDefault();
+            state.closeTab(state.activeTab);
           }
           break;
         case "e":
@@ -204,6 +218,46 @@ function useSidebarLayout() {
   }, [sidebarWidth, sidebarFontSize, fontSize]);
 }
 
+const CUSTOM_CSS_STYLE_ID = "custom-user-css";
+
+function useCustomCSS() {
+  const customCSSContent = useAppStore((s) => s.customCSSContent);
+
+  // On mount, load the saved custom CSS path from config
+  useEffect(() => {
+    window.api.getCustomCSS().then((result) => {
+      if (result) {
+        useAppStore.getState().setCustomCSS(result.path, result.content);
+      }
+    }).catch(() => {
+      // Config unavailable — silently ignore
+    });
+  }, []);
+
+  // Inject or remove the <style> element when customCSSContent changes
+  useEffect(() => {
+    let style = document.getElementById(CUSTOM_CSS_STYLE_ID) as HTMLStyleElement | null;
+
+    if (customCSSContent) {
+      if (!style) {
+        style = document.createElement("style");
+        style.id = CUSTOM_CSS_STYLE_ID;
+        document.head.appendChild(style);
+      }
+      style.textContent = customCSSContent;
+    } else {
+      if (style) {
+        style.remove();
+      }
+    }
+
+    return () => {
+      const el = document.getElementById(CUSTOM_CSS_STYLE_ID);
+      if (el) el.remove();
+    };
+  }, [customCSSContent]);
+}
+
 function useFileAssociation() {
   useEffect(() => {
     const unsubFile = window.api.onFileOpened(async (filePath) => {
@@ -218,6 +272,43 @@ function useFileAssociation() {
       const store = useAppStore.getState();
       const tree = await window.api.scanDirectory(dirPath);
       store.addProject(dirPath, tree);
+    });
+
+    // File watching: auto-reload content when the selected file changes on disk
+    const unsubFileChanged = window.api.onFileChanged((filePath, content) => {
+      const state = useAppStore.getState();
+
+      // Only update if this is the currently selected file
+      if (state.selectedFile !== filePath) return;
+
+      // Don't overwrite a dirty editor — the user has unsaved local changes
+      if (state.editDirty) return;
+
+      state.setMarkdownContent(content);
+
+      // If in edit mode, sync the editor content too
+      if (state.editMode) {
+        state.setEditContent(content);
+        state.setEditDirty(false);
+      }
+    });
+
+    // File watching: auto-refresh tree when files are added/removed/renamed
+    const unsubTreeChanged = window.api.onTreeChanged((rootPath, tree) => {
+      const state = useAppStore.getState();
+      const project = state.projects.find((p) => p.rootPath === rootPath);
+      if (project) {
+        state.updateProjectTree(project.id, tree);
+        // If the selected file no longer exists in the updated tree, clear it
+        const sel = useAppStore.getState().selectedFile;
+        if (sel && sel.startsWith(rootPath)) {
+          const stillExists = (nodes: TreeNode[]): boolean =>
+            nodes.some((n) => n.path === sel || (n.children && stillExists(n.children)));
+          if (!stillExists(tree)) {
+            useAppStore.getState().closeTab(sel);
+          }
+        }
+      }
     });
 
     // Pull initial CLI path after mount (avoids race with push-based IPC)
@@ -241,6 +332,8 @@ function useFileAssociation() {
     return () => {
       unsubFile();
       unsubDir();
+      unsubFileChanged();
+      unsubTreeChanged();
     };
   }, []);
 }
@@ -250,6 +343,7 @@ export function App() {
   useThemeAndFont();
   useReadingComfort();
   useSidebarLayout();
+  useCustomCSS();
   useFileAssociation();
 
   const focusMode = useAppStore((s) => s.focusMode);
@@ -260,8 +354,10 @@ export function App() {
       <div className="app-body">
         <Sidebar />
         <main className="main-content">
+          <TabBar />
           <MarkdownPreview />
         </main>
+        <DocumentOutline />
       </div>
       <Settings />
     </div>

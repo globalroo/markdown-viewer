@@ -1,8 +1,8 @@
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
 import { useAppStore, THEMES, FONTS, type ThemeId, type FontId } from "../store";
 
 export function Settings() {
-  const { theme, setTheme, font, setFont, contentWidth, setContentWidth, lineHeight, setLineHeight, warmFilter, toggleWarmFilter, sidebarFontSize, setSidebarFontSize, settingsOpen, toggleSettings } =
+  const { theme, setTheme, font, setFont, contentWidth, setContentWidth, lineHeight, setLineHeight, warmFilter, toggleWarmFilter, sidebarFontSize, setSidebarFontSize, settingsOpen, toggleSettings, customCSSPath, setCustomCSS, clearCustomCSS: storeClearCustomCSS } =
     useAppStore();
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -179,6 +179,43 @@ export function Settings() {
               <span className="toggle-option-label">Warm filter</span>
               <span className="toggle-option-desc">Reduces blue light for evening reading</span>
             </button>
+          </section>
+
+          <section className="settings-section">
+            <h3>Custom CSS</h3>
+            <p className="settings-hint">
+              Load a .css file to style the preview area. Rules should target
+              <code>.preview-content</code> and its children.
+            </p>
+            <div className="custom-css-controls">
+              <button
+                className="custom-css-btn"
+                onClick={async () => {
+                  const result = await window.api.loadCustomCSS();
+                  if (result) {
+                    setCustomCSS(result.path, result.content);
+                  }
+                }}
+              >
+                Load CSS File...
+              </button>
+              {customCSSPath && (
+                <button
+                  className="custom-css-btn custom-css-clear"
+                  onClick={async () => {
+                    await window.api.clearCustomCSS();
+                    storeClearCustomCSS();
+                  }}
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+            <div className="custom-css-status">
+              {customCSSPath
+                ? customCSSPath.split(/[/\\]/).pop()
+                : "None"}
+            </div>
           </section>
         </div>
       </div>

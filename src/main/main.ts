@@ -14,8 +14,163 @@ import { pathToFileURL } from "url";
 let mainWindow: BrowserWindow | null = null;
 let pendingFilePath: string | null = null;
 
+// --- User config persistence (custom CSS path, etc.) ---
+function getConfigPath(): string {
+  return path.join(app.getPath("userData"), "user-config.json");
+}
+
+interface UserConfig {
+  customCSSPath?: string | null;
+}
+
+function readConfig(): UserConfig {
+  try {
+    const raw = fs.readFileSync(getConfigPath(), "utf-8");
+    return JSON.parse(raw) as UserConfig;
+  } catch {
+    return {};
+  }
+}
+
+function writeConfig(config: UserConfig): void {
+  const configPath = getConfigPath();
+  fs.mkdirSync(path.dirname(configPath), { recursive: true });
+  fs.writeFileSync(configPath, JSON.stringify(config, null, 2), "utf-8");
+}
+
 // Track allowed project roots for IPC path validation
 const allowedRoots = new Set<string>();
+
+// --- File watching ---
+// Track active fs.watch watchers per project root
+const activeWatchers = new Map<string, fs.FSWatcher>();
+
+// Directories to skip when watching (same set used by scanDirectory)
+const SKIP_DIRS = new Set([
+  "node_modules",
+  ".git",
+  ".hg",
+  ".svn",
+  "dist",
+  "build",
+  ".next",
+  "__pycache__",
+  ".gestalt",
+]);
+
+// Debounce timers keyed by event type + path
+const debounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+function debounced(key: string, delayMs: number, fn: () => void): void {
+  const existing = debounceTimers.get(key);
+  if (existing) clearTimeout(existing);
+  debounceTimers.set(
+    key,
+    setTimeout(() => {
+      debounceTimers.delete(key);
+      fn();
+    }, delayMs)
+  );
+}
+
+function startWatching(rootPath: string): void {
+  // Don't double-watch the same root
+  if (activeWatchers.has(rootPath)) return;
+
+  // fs.watch with { recursive: true } is only supported on macOS and Windows.
+  // On Linux it throws or silently ignores subdirectories.
+  if (process.platform === "linux") return;
+
+  let watcher: fs.FSWatcher;
+  try {
+    watcher = fs.watch(rootPath, { recursive: true }, (eventType, filename) => {
+      if (!filename || !mainWindow) return;
+
+      // Normalise path separators on Windows
+      const relativePath = filename.replace(/\\/g, "/");
+      const segments = relativePath.split("/");
+
+      // Skip events inside ignored directories
+      if (segments.some((seg) => SKIP_DIRS.has(seg) || (seg.startsWith(".") && seg !== ".github"))) {
+        return;
+      }
+
+      const fullPath = path.join(rootPath, filename);
+      const isMarkdown = /\.(md|markdown|mdown|mkd|mkdn)$/i.test(filename);
+
+      if (eventType === "rename") {
+        // A file/directory was added, removed, or renamed — refresh the tree
+        debounced(`tree:${rootPath}`, 150, () => {
+          if (!mainWindow) return;
+          try {
+            const tree = scanDirectory(rootPath);
+            mainWindow.webContents.send("tree-changed", rootPath, tree);
+          } catch {
+            // Directory may have been removed
+          }
+        });
+      }
+
+      if (eventType === "change" && isMarkdown) {
+        // File content changed — notify renderer
+        debounced(`file:${fullPath}`, 150, () => {
+          if (!mainWindow) return;
+          try {
+            const content = readFileContent(fullPath);
+            mainWindow.webContents.send("file-changed", fullPath, content);
+          } catch {
+            // File may have been deleted between event and read
+          }
+        });
+      }
+
+      // A rename of a markdown file also means its content should reload if selected
+      if (eventType === "rename" && isMarkdown) {
+        debounced(`file:${fullPath}`, 200, () => {
+          if (!mainWindow) return;
+          try {
+            fs.statSync(fullPath); // check file still exists
+            const content = readFileContent(fullPath);
+            mainWindow.webContents.send("file-changed", fullPath, content);
+          } catch {
+            // File was removed — tree-changed already covers this
+          }
+        });
+      }
+    });
+  } catch {
+    // fs.watch may fail on some filesystems — degrade gracefully
+    return;
+  }
+
+  activeWatchers.set(rootPath, watcher);
+
+  // Handle watcher errors (e.g. directory deleted)
+  watcher.on("error", () => {
+    stopWatching(rootPath);
+  });
+}
+
+function stopWatching(rootPath: string): void {
+  const watcher = activeWatchers.get(rootPath);
+  if (watcher) {
+    watcher.close();
+    activeWatchers.delete(rootPath);
+  }
+  // Clean up any pending debounce timers for this root
+  for (const [key, timer] of debounceTimers) {
+    if (key.startsWith(`tree:${rootPath}`) || key.startsWith(`file:${rootPath}`)) {
+      clearTimeout(timer);
+      debounceTimers.delete(key);
+    }
+  }
+}
+
+function stopAllWatchers(): void {
+  for (const [rootPath] of activeWatchers) {
+    stopWatching(rootPath);
+  }
+}
 
 function addAllowedRoot(dirPath: string): void {
   try {
@@ -175,6 +330,7 @@ ipcMain.handle("open-folder", async () => {
   const dirPath = result.filePaths[0];
   addAllowedRoot(dirPath);
   const tree = scanDirectory(dirPath);
+  startWatching(dirPath);
   return { rootPath: dirPath, tree };
 });
 
@@ -276,8 +432,124 @@ ipcMain.handle(
 );
 
 ipcMain.handle("remove-root", async (_event, rootPath: string) => {
+  stopWatching(rootPath);
   removeAllowedRoot(rootPath);
 });
+
+// Content search across all markdown files in given roots
+interface SearchResult {
+  filePath: string;
+  line: number;
+  text: string;
+}
+
+function collectMarkdownFiles(dirPath: string): string[] {
+  const results: string[] = [];
+  let entries: fs.Dirent[];
+  try {
+    entries = fs.readdirSync(dirPath, { withFileTypes: true });
+  } catch {
+    return results;
+  }
+  for (const entry of entries) {
+    if (entry.name.startsWith(".") && entry.name !== ".github") continue;
+    const fullPath = path.join(dirPath, entry.name);
+    if (entry.isDirectory()) {
+      if (SKIP_DIRS.has(entry.name)) continue;
+      results.push(...collectMarkdownFiles(fullPath));
+    } else if (
+      entry.isFile() &&
+      /\.(md|markdown|mdown|mkd|mkdn)$/i.test(entry.name)
+    ) {
+      results.push(fullPath);
+    }
+  }
+  return results;
+}
+
+function searchFileContent(
+  filePath: string,
+  queryLower: string,
+  results: SearchResult[],
+  limit: number
+): void {
+  let content: string;
+  try {
+    content = fs.readFileSync(filePath, "utf-8");
+  } catch {
+    return;
+  }
+  const lines = content.split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    if (results.length >= limit) return;
+    if (lines[i].toLowerCase().includes(queryLower)) {
+      results.push({
+        filePath,
+        line: i + 1,
+        text: lines[i],
+      });
+    }
+  }
+}
+
+ipcMain.handle(
+  "search-content",
+  async (
+    _event,
+    query: string,
+    roots: string[]
+  ): Promise<SearchResult[]> => {
+    if (!query || query.trim().length === 0) return [];
+    const queryLower = query.toLowerCase();
+    const limit = 100;
+    const results: SearchResult[] = [];
+
+    for (const root of roots) {
+      if (!isPathAllowed(root)) continue;
+      try {
+        const files = collectMarkdownFiles(root);
+        for (const filePath of files) {
+          if (results.length >= limit) break;
+          searchFileContent(filePath, queryLower, results, limit);
+        }
+      } catch {
+        // Root may no longer exist
+      }
+      if (results.length >= limit) break;
+    }
+
+    return results;
+  }
+);
+
+// Export handlers
+ipcMain.handle(
+  "export-html",
+  async (_event, html: string, cssContent: string, theme?: string, font?: string, rootStyle?: string, warmFilter?: boolean): Promise<void> => {
+    const result = await dialog.showSaveDialog({
+      defaultPath: "document.html",
+      filters: [{ name: "HTML", extensions: ["html"] }],
+    });
+    if (result.canceled || !result.filePath) return;
+    const themeAttr = theme ? ` data-theme="${theme}"` : "";
+    const fontAttr = font ? ` data-font="${font}"` : "";
+    const styleAttr = rootStyle ? ` style="${rootStyle}"` : "";
+    const warmClass = warmFilter ? ` class="warm-filter"` : "";
+    const doc = `<!DOCTYPE html>
+<html lang="en"${themeAttr}${fontAttr}${styleAttr}${warmClass}>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Exported Document</title>
+<style>${cssContent}</style>
+</head>
+<body>
+<div class="preview-content">${html}</div>
+</body>
+</html>`;
+    fs.writeFileSync(result.filePath, doc, "utf-8");
+  }
+);
 
 // Return the initial CLI path so the renderer can request it after mount
 let initialPathForRenderer: string | null = null;
@@ -286,6 +558,42 @@ ipcMain.handle("get-initial-path", async () => {
   const result = initialPathForRenderer;
   initialPathForRenderer = null; // consume once
   return result;
+});
+
+// --- Custom CSS IPC handlers ---
+
+ipcMain.handle("load-custom-css", async (): Promise<{ path: string; content: string } | null> => {
+  const result = await dialog.showOpenDialog({
+    properties: ["openFile"],
+    filters: [{ name: "CSS Stylesheets", extensions: ["css"] }],
+  });
+  if (result.canceled || result.filePaths.length === 0) return null;
+  const cssPath = result.filePaths[0];
+  const content = fs.readFileSync(cssPath, "utf-8");
+  const config = readConfig();
+  config.customCSSPath = cssPath;
+  writeConfig(config);
+  return { path: cssPath, content };
+});
+
+ipcMain.handle("get-custom-css", async (): Promise<{ path: string; content: string } | null> => {
+  const config = readConfig();
+  if (!config.customCSSPath) return null;
+  try {
+    const content = fs.readFileSync(config.customCSSPath, "utf-8");
+    return { path: config.customCSSPath, content };
+  } catch {
+    // File no longer exists — clear the saved path
+    config.customCSSPath = null;
+    writeConfig(config);
+    return null;
+  }
+});
+
+ipcMain.handle("clear-custom-css", async (): Promise<void> => {
+  const config = readConfig();
+  config.customCSSPath = null;
+  writeConfig(config);
 });
 
 // Find the first real file/directory path in an argv slice, skipping Chromium flags.
@@ -316,7 +624,9 @@ function getInitialPath(): string | null {
 app.on("open-file", (_event, filePath) => {
   if (mainWindow) {
     // Add parent directory to allowed roots so scan-directory works
-    addAllowedRoot(path.dirname(filePath));
+    const dirPath = path.dirname(filePath);
+    addAllowedRoot(dirPath);
+    startWatching(dirPath);
     mainWindow.webContents.send("file-opened", filePath);
   } else {
     pendingFilePath = filePath;
@@ -346,6 +656,7 @@ if (!gotLock) {
         const stat = fs.statSync(target);
         const dirPath = stat.isDirectory() ? target : path.dirname(target);
         addAllowedRoot(dirPath);
+        startWatching(dirPath);
         if (stat.isDirectory()) {
           mainWindow.webContents.send("open-directory", target);
         } else {
@@ -400,6 +711,7 @@ app.whenReady().then(() => {
       const stat = fs.statSync(initialPath);
       const dirPath = stat.isDirectory() ? initialPath : path.dirname(initialPath);
       addAllowedRoot(dirPath);
+      startWatching(dirPath);
     } catch {
       // ignore
     }
@@ -413,7 +725,12 @@ app.whenReady().then(() => {
 });
 
 app.on("window-all-closed", () => {
+  stopAllWatchers();
   if (process.platform !== "darwin") {
     app.quit();
   }
+});
+
+app.on("will-quit", () => {
+  stopAllWatchers();
 });

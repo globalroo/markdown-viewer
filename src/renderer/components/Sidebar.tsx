@@ -1,6 +1,6 @@
 import { useAppStore } from "../store";
 import { FileTree } from "./FileTree";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import { ChevronIcon, ProjectIcon, AddFolderIcon } from "./Icons";
 
 const SIDEBAR_SIZE_OPTIONS = [
@@ -235,8 +235,128 @@ function SidebarTextSizeButton() {
   );
 }
 
+function HighlightedText({ text, query }: { text: string; query: string }) {
+  if (!query) return <>{text}</>;
+  const lower = text.toLowerCase();
+  const qLower = query.toLowerCase();
+  const parts: React.ReactNode[] = [];
+  let cursor = 0;
+  let idx = lower.indexOf(qLower, cursor);
+  let key = 0;
+  while (idx !== -1) {
+    if (idx > cursor) {
+      parts.push(<span key={key++}>{text.slice(cursor, idx)}</span>);
+    }
+    parts.push(
+      <mark key={key++} className="search-highlight">
+        {text.slice(idx, idx + query.length)}
+      </mark>
+    );
+    cursor = idx + query.length;
+    idx = lower.indexOf(qLower, cursor);
+  }
+  if (cursor < text.length) {
+    parts.push(<span key={key++}>{text.slice(cursor)}</span>);
+  }
+  return <>{parts}</>;
+}
+
+function ContentSearchResults({
+  results,
+  query,
+  isSearching,
+}: {
+  results: SearchResult[];
+  query: string;
+  isSearching: boolean;
+}) {
+  const { selectFile } = useAppStore();
+
+  const handleClick = useCallback(
+    (result: SearchResult) => {
+      selectFile(result.filePath);
+      // Read and display the file, then attempt to scroll to the matching line
+      window.api.readFile(result.filePath).then((content) => {
+        useAppStore.getState().setMarkdownContent(content);
+        // Scroll to approximate position based on line number
+        requestAnimationFrame(() => {
+          const scrollEl = document.querySelector(".preview-scroll");
+          if (!scrollEl) return;
+          const contentEl = scrollEl.querySelector(".preview-content");
+          if (!contentEl) return;
+          const totalLines = content.split("\n").length;
+          const ratio = Math.max(0, (result.line - 1) / totalLines);
+          const scrollTarget = ratio * scrollEl.scrollHeight;
+          scrollEl.scrollTo({ top: scrollTarget, behavior: "smooth" });
+        });
+      });
+    },
+    [selectFile]
+  );
+
+  // Group results by file
+  const grouped = useMemo(() => {
+    const map = new Map<string, SearchResult[]>();
+    for (const r of results) {
+      let list = map.get(r.filePath);
+      if (!list) {
+        list = [];
+        map.set(r.filePath, list);
+      }
+      list.push(r);
+    }
+    return map;
+  }, [results]);
+
+  if (isSearching) {
+    return <div className="search-results-status">Searching...</div>;
+  }
+
+  if (results.length === 0 && query) {
+    return <div className="search-results-status">No content matches</div>;
+  }
+
+  return (
+    <div className="search-results-list">
+      {Array.from(grouped.entries()).map(([filePath, fileResults]) => {
+        const fileName = filePath.split(/[/\\]/).pop() || filePath;
+        return (
+          <div key={filePath} className="search-result-group">
+            <div className="search-result-file" title={filePath}>
+              {fileName}
+            </div>
+            {fileResults.map((r, i) => (
+              <button
+                key={`${r.line}-${i}`}
+                className="search-result-item"
+                onClick={() => handleClick(r)}
+                title={`${filePath}:${r.line}`}
+              >
+                <span className="search-result-line">L{r.line}</span>
+                <span className="search-result-text">
+                  <HighlightedText text={r.text.trim()} query={query} />
+                </span>
+              </button>
+            ))}
+          </div>
+        );
+      })}
+      {results.length >= 100 && (
+        <div className="search-results-status">
+          Showing first 100 results. Refine your query.
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function Sidebar() {
   const { projects, searchQuery, setSearchQuery, sidebarVisible } = useAppStore();
+  const [contentSearchMode, setContentSearchMode] = useState(false);
+  const [contentResults, setContentResults] = useState<SearchResult[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastQueryRef = useRef("");
 
   const handleAddFolder = useCallback(async () => {
     const result = await window.api.openFolder();
@@ -244,6 +364,91 @@ export function Sidebar() {
       useAppStore.getState().addProject(result.rootPath, result.tree);
     }
   }, []);
+
+  // Run content search with debounce
+  const runContentSearch = useCallback(
+    (query: string) => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      lastQueryRef.current = query;
+
+      if (!query.trim()) {
+        setContentResults([]);
+        setIsSearching(false);
+        return;
+      }
+
+      setIsSearching(true);
+      debounceRef.current = setTimeout(() => {
+        const roots = useAppStore
+          .getState()
+          .projects.map((p) => p.rootPath);
+        window.api.searchContent(query, roots).then((results) => {
+          // Only apply results if query hasn't changed since dispatch
+          if (lastQueryRef.current === query) {
+            setContentResults(results);
+            setIsSearching(false);
+          }
+        });
+      }, 300);
+    },
+    []
+  );
+
+  // Handle Enter key to trigger content search mode
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === "Enter" && searchQuery.trim()) {
+        e.preventDefault();
+        if (!contentSearchMode) {
+          setContentSearchMode(true);
+        }
+        runContentSearch(searchQuery);
+      }
+      if (e.key === "Escape") {
+        if (contentSearchMode) {
+          setContentSearchMode(false);
+          setContentResults([]);
+          setIsSearching(false);
+        }
+      }
+    },
+    [searchQuery, contentSearchMode, runContentSearch]
+  );
+
+  // Re-run content search when query changes while in content mode
+  useEffect(() => {
+    if (contentSearchMode && searchQuery.trim()) {
+      runContentSearch(searchQuery);
+    } else if (contentSearchMode && !searchQuery.trim()) {
+      setContentResults([]);
+      setIsSearching(false);
+    }
+  }, [searchQuery, contentSearchMode, runContentSearch]);
+
+  // Cleanup debounce on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, []);
+
+  const handleClear = useCallback(() => {
+    setSearchQuery("");
+    setContentSearchMode(false);
+    setContentResults([]);
+    setIsSearching(false);
+  }, [setSearchQuery]);
+
+  const toggleSearchMode = useCallback(() => {
+    const next = !contentSearchMode;
+    setContentSearchMode(next);
+    if (next && searchQuery.trim()) {
+      runContentSearch(searchQuery);
+    } else {
+      setContentResults([]);
+      setIsSearching(false);
+    }
+  }, [contentSearchMode, searchQuery, runContentSearch]);
 
   if (!sidebarVisible) return null;
 
@@ -261,37 +466,61 @@ export function Sidebar() {
           <input
             type="text"
             className="search-input"
-            placeholder="Filter files..."
+            placeholder={contentSearchMode ? "Search in files..." : "Filter files..."}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={handleKeyDown}
           />
-          {searchQuery && (
+          <div className="search-actions">
             <button
-              className="search-clear"
-              onClick={() => setSearchQuery("")}
-              aria-label="Clear search"
+              className={`search-mode-toggle ${contentSearchMode ? "active" : ""}`}
+              onClick={toggleSearchMode}
+              title={contentSearchMode ? "Switch to filename filter" : "Search file contents (Enter)"}
+              aria-label="Toggle content search"
             >
-              <svg aria-hidden="true" width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-                <line x1="1" y1="1" x2="9" y2="9" />
-                <line x1="9" y1="1" x2="1" y2="9" />
+              <svg aria-hidden="true" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="6.5" cy="6.5" r="5" />
+                <line x1="10" y1="10" x2="14.5" y2="14.5" />
               </svg>
             </button>
-          )}
+            {searchQuery && (
+              <button
+                className="search-clear"
+                onClick={handleClear}
+                aria-label="Clear search"
+              >
+                <svg aria-hidden="true" width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                  <line x1="1" y1="1" x2="9" y2="9" />
+                  <line x1="9" y1="1" x2="1" y2="9" />
+                </svg>
+              </button>
+            )}
+          </div>
         </div>
       )}
 
       <div className="sidebar-content">
-        {projects.map((project) => (
-          <ProjectSection key={project.id} project={project} />
-        ))}
+        {contentSearchMode ? (
+          <ContentSearchResults
+            results={contentResults}
+            query={searchQuery}
+            isSearching={isSearching}
+          />
+        ) : (
+          <>
+            {projects.map((project) => (
+              <ProjectSection key={project.id} project={project} />
+            ))}
 
-        {projects.length === 0 && (
-          <div className="sidebar-empty">
-            <p>Add a folder to browse markdown files</p>
-            <p className="shortcut-hint">
-              {navigator.platform.includes("Mac") ? "⌘" : "Ctrl+"}O
-            </p>
-          </div>
+            {projects.length === 0 && (
+              <div className="sidebar-empty">
+                <p>Add a folder to browse markdown files</p>
+                <p className="shortcut-hint">
+                  {navigator.platform.includes("Mac") ? "⌘" : "Ctrl+"}O
+                </p>
+              </div>
+            )}
+          </>
         )}
       </div>
       <SidebarResizeHandle />
