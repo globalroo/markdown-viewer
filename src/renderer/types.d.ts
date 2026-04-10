@@ -27,6 +27,8 @@ interface ElectronAPI {
   removeRoot: (rootPath: string) => Promise<void>;
   getInitialPath: () => Promise<string | null>;
   exportHTML: (html: string, css: string, theme?: string, font?: string, rootStyle?: string, warmFilter?: boolean) => Promise<void>;
+  exportPDF: () => Promise<void>;
+  exportDOCX: (html: string, css: string, theme?: string, font?: string, rootStyle?: string, warmFilter?: boolean) => Promise<void>;
   searchContent: (query: string, roots: string[]) => Promise<SearchResult[]>;
   loadCustomCSS: () => Promise<{ path: string; content: string } | null>;
   getCustomCSS: () => Promise<{ path: string; content: string } | null>;

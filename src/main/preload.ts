@@ -48,6 +48,10 @@ const api = {
 
   exportHTML: (html: string, css: string, theme?: string, font?: string, rootStyle?: string, warmFilter?: boolean): Promise<void> =>
     ipcRenderer.invoke("export-html", html, css, theme, font, rootStyle, warmFilter),
+  exportPDF: (): Promise<void> =>
+    ipcRenderer.invoke("export-pdf"),
+  exportDOCX: (html: string, css: string, theme?: string, font?: string, rootStyle?: string, warmFilter?: boolean): Promise<void> =>
+    ipcRenderer.invoke("export-docx", html, css, theme, font, rootStyle, warmFilter),
 
   loadCustomCSS: (): Promise<{ path: string; content: string } | null> =>
     ipcRenderer.invoke("load-custom-css"),

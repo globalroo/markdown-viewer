@@ -641,6 +641,35 @@ export function MarkdownPreview() {
     await window.api.exportHTML(portableHtml, css, theme, font, rootInlineStyle, warmFilter);
   }, [html]);
 
+  const handleExportPDF = useCallback(async () => {
+    await window.api.exportPDF();
+  }, []);
+
+  const handleExportDOCX = useCallback(async () => {
+    if (!html) return;
+    const portableHtml = html.replace(/local-img:\/\/([^"')\s]+)/g, (_match, encoded) => {
+      const decoded = decodeURIComponent(encoded);
+      return "file://" + decoded;
+    });
+    const styleSheets = Array.from(document.styleSheets);
+    let css = "";
+    for (const sheet of styleSheets) {
+      try {
+        for (const rule of sheet.cssRules) {
+          css += rule.cssText + "\n";
+        }
+      } catch {
+        // Cross-origin stylesheets can't be read
+      }
+    }
+    const root = document.documentElement;
+    const theme = root.getAttribute("data-theme") || "light";
+    const font = root.getAttribute("data-font") || "system";
+    const rootInlineStyle = root.style.cssText;
+    const warmFilter = root.classList.contains("warm-filter");
+    await window.api.exportDOCX(portableHtml, css, theme, font, rootInlineStyle, warmFilter);
+  }, [html]);
+
   const handleSave = useCallback(async () => {
     if (!selectedFile || !editDirty) return;
     await window.api.writeFile(selectedFile, editContent);
@@ -732,7 +761,21 @@ export function MarkdownPreview() {
             onClick={handleExportHTML}
             title="Export as HTML"
           >
-            Export
+            HTML
+          </button>
+          <button
+            className="preview-copy-btn"
+            onClick={handleExportPDF}
+            title="Export as PDF"
+          >
+            PDF
+          </button>
+          <button
+            className="preview-copy-btn"
+            onClick={handleExportDOCX}
+            title="Export as DOCX"
+          >
+            DOCX
           </button>
           <button
             className="preview-reveal-btn"

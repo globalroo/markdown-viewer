@@ -234,23 +234,33 @@ export const useAppStore = create<AppState>((set) => ({
         window.api.removeRoot(removed.rootPath);
       }
       const projects = state.projects.filter((p) => p.id !== id);
-      const selectedFile =
-        state.selectedFile && state.selectedFile.startsWith(id)
-          ? null
-          : state.selectedFile;
       const belongsToProject = (p: string) =>
         p === id || p.startsWith(id + "/") || p.startsWith(id + "\\");
+      const selectedFile =
+        state.selectedFile && belongsToProject(state.selectedFile)
+          ? null
+          : state.selectedFile;
       const openTabs = state.openTabs.filter((t) => !belongsToProject(t.filePath));
       let activeTab = state.activeTab;
       if (activeTab && belongsToProject(activeTab)) {
         activeTab = openTabs.length > 0 ? openTabs[0].filePath : null;
       }
+      // Clear dirty state if the draft belongs to the removed project
+      const editDirty = state.editDirty && state.editFilePath && belongsToProject(state.editFilePath)
+        ? false
+        : state.editDirty;
+      const editFilePath = state.editFilePath && belongsToProject(state.editFilePath)
+        ? null
+        : state.editFilePath;
+
       return {
         projects,
         selectedFile: selectedFile ?? activeTab,
         markdownContent: selectedFile ?? activeTab ? state.markdownContent : "",
         openTabs,
         activeTab,
+        editDirty,
+        editFilePath,
       };
     }),
 
@@ -395,11 +405,19 @@ export const useAppStore = create<AppState>((set) => ({
           selectedFile = activeTab;
         }
       }
+      // If the closed tab had a dirty draft, clear it to prevent orphaned state
+      const editDirty = state.editDirty && state.editFilePath === filePath
+        ? false
+        : state.editDirty;
+      const editFilePath = state.editFilePath === filePath ? null : state.editFilePath;
+
       return {
         openTabs,
         activeTab,
         selectedFile,
         markdownContent: selectedFile ? state.markdownContent : "",
+        editDirty,
+        editFilePath,
       };
     }),
 

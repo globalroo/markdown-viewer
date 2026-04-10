@@ -303,7 +303,7 @@ function useFileAssociation() {
         state.updateProjectTree(project.id, tree);
         // If the selected file no longer exists in the updated tree, clear it
         const sel = useAppStore.getState().selectedFile;
-        if (sel && sel.startsWith(rootPath)) {
+        if (sel && (sel === rootPath || sel.startsWith(rootPath + "/") || sel.startsWith(rootPath + "\\"))) {
           const stillExists = (nodes: TreeNode[]): boolean =>
             nodes.some((n) => n.path === sel || (n.children && stillExists(n.children)));
           if (!stillExists(tree)) {

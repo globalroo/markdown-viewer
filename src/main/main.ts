@@ -522,6 +522,10 @@ ipcMain.handle(
   }
 );
 
+function escapeAttr(value: string): string {
+  return value.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
 // Export handlers
 ipcMain.handle(
   "export-html",
@@ -531,9 +535,9 @@ ipcMain.handle(
       filters: [{ name: "HTML", extensions: ["html"] }],
     });
     if (result.canceled || !result.filePath) return;
-    const themeAttr = theme ? ` data-theme="${theme}"` : "";
-    const fontAttr = font ? ` data-font="${font}"` : "";
-    const styleAttr = rootStyle ? ` style="${rootStyle}"` : "";
+    const themeAttr = theme ? ` data-theme="${escapeAttr(theme)}"` : "";
+    const fontAttr = font ? ` data-font="${escapeAttr(font)}"` : "";
+    const styleAttr = rootStyle ? ` style="${escapeAttr(rootStyle)}"` : "";
     const warmClass = warmFilter ? ` class="warm-filter"` : "";
     const doc = `<!DOCTYPE html>
 <html lang="en"${themeAttr}${fontAttr}${styleAttr}${warmClass}>
@@ -548,6 +552,59 @@ ipcMain.handle(
 </body>
 </html>`;
     fs.writeFileSync(result.filePath, doc, "utf-8");
+  }
+);
+
+ipcMain.handle("export-pdf", async (): Promise<void> => {
+  if (!mainWindow) return;
+  const result = await dialog.showSaveDialog({
+    defaultPath: "document.pdf",
+    filters: [{ name: "PDF", extensions: ["pdf"] }],
+  });
+  if (result.canceled || !result.filePath) return;
+  const pdfData = await mainWindow.webContents.printToPDF({
+    printBackground: true,
+    margins: { marginType: "default" },
+  });
+  fs.writeFileSync(result.filePath, pdfData);
+});
+
+ipcMain.handle(
+  "export-docx",
+  async (_event, html: string, cssContent: string, theme?: string, font?: string, rootStyle?: string, warmFilter?: boolean): Promise<void> => {
+    const result = await dialog.showSaveDialog({
+      defaultPath: "document.docx",
+      filters: [{ name: "Word Document", extensions: ["docx"] }],
+    });
+    if (result.canceled || !result.filePath) return;
+    const themeAttr = theme ? ` data-theme="${escapeAttr(theme)}"` : "";
+    const fontAttr = font ? ` data-font="${escapeAttr(font)}"` : "";
+    const styleAttr = rootStyle ? ` style="${escapeAttr(rootStyle)}"` : "";
+    const warmClass = warmFilter ? ` class="warm-filter"` : "";
+    const fullHtml = `<!DOCTYPE html>
+<html lang="en"${themeAttr}${fontAttr}${styleAttr}${warmClass}>
+<head>
+<meta charset="utf-8">
+<style>${cssContent}</style>
+</head>
+<body>
+<div class="preview-content">${html}</div>
+</body>
+</html>`;
+    const htmlDocxModule = await import("html-docx-js");
+    const htmlDocx = htmlDocxModule.default || htmlDocxModule;
+    const docxResult = htmlDocx.asBlob(fullHtml);
+    // html-docx-js returns Buffer in Node, Blob in browser — handle both
+    let bytes: Buffer;
+    if (Buffer.isBuffer(docxResult)) {
+      bytes = docxResult;
+    } else if (docxResult instanceof Blob) {
+      const arrayBuf = await docxResult.arrayBuffer();
+      bytes = Buffer.from(arrayBuf);
+    } else {
+      bytes = Buffer.from(docxResult as ArrayBuffer);
+    }
+    fs.writeFileSync(result.filePath, bytes);
   }
 );
 
