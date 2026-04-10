@@ -1737,9 +1737,10 @@ body {
 .tab-bar {
   display: flex;
   align-items: stretch;
+  flex-wrap: wrap;
   flex-shrink: 0;
-  overflow-x: auto;
-  overflow-y: hidden;
+  max-height: 120px;
+  overflow-y: auto;
   background: var(--bg-toolbar);
   border-bottom: 1px solid var(--border-color);
   scrollbar-width: thin;
@@ -1747,7 +1748,7 @@ body {
 }
 
 .tab-bar::-webkit-scrollbar {
-  height: 3px;
+  width: 3px;
 }
 
 .tab-bar::-webkit-scrollbar-track {
@@ -1835,8 +1836,8 @@ body {
 .outline-resize-handle {
   position: absolute;
   top: 0;
-  left: 0;
-  width: 4px;
+  left: -4px;
+  width: 10px;
   height: 100%;
   cursor: col-resize;
   z-index: 10;
@@ -1847,7 +1848,7 @@ body {
   content: "";
   position: absolute;
   top: 0;
-  left: 0;
+  left: 4px;
   width: 2px;
   height: 100%;
   background: transparent;
