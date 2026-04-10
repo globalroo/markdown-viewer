@@ -114,6 +114,7 @@ interface AppState {
 
   // Document outline
   outlineVisible: boolean;
+  outlineWidth: number;
 
   // Custom CSS
   customCSSPath: string | null;
@@ -163,6 +164,8 @@ interface AppState {
 
   // Document outline actions
   toggleOutline: () => void;
+  setOutlineWidth: (width: number) => void;
+  resetOutlineWidth: () => void;
 
   // Custom CSS actions
   setCustomCSS: (path: string | null, content: string) => void;
@@ -203,6 +206,7 @@ export const useAppStore = create<AppState>((set) => ({
   editFilePath: null,
   renamingPath: null,
   outlineVisible: true,
+  outlineWidth: 200,
   customCSSPath: null,
   customCSSContent: "",
   openTabs: [],
@@ -354,6 +358,11 @@ export const useAppStore = create<AppState>((set) => ({
 
   toggleOutline: () =>
     set((state) => ({ outlineVisible: !state.outlineVisible })),
+
+  setOutlineWidth: (width) =>
+    set({ outlineWidth: Math.min(400, Math.max(160, width)) }),
+
+  resetOutlineWidth: () => set({ outlineWidth: 200 }),
 
   setCustomCSS: (path, content) =>
     set({ customCSSPath: path, customCSSContent: content }),

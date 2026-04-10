@@ -20,11 +20,115 @@ function OutlineIcon() {
 
 export { OutlineIcon };
 
+function CollapseIcon() {
+  return (
+    <svg aria-hidden="true" width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="5 3 9 7 5 11" />
+    </svg>
+  );
+}
+
+function ExpandIcon() {
+  return (
+    <svg aria-hidden="true" width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="9 3 5 7 9 11" />
+    </svg>
+  );
+}
+
+function OutlineResizeHandle() {
+  const startXRef = useRef(0);
+  const startWidthRef = useRef(0);
+  const { setOutlineWidth, resetOutlineWidth, outlineWidth } = useAppStore();
+
+  const handlePointerDown = useCallback((e: React.PointerEvent) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    startXRef.current = e.clientX;
+    startWidthRef.current = useAppStore.getState().outlineWidth;
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  }, []);
+
+  const handlePointerMove = useCallback((e: React.PointerEvent) => {
+    if (!(e.target as HTMLElement).hasPointerCapture(e.pointerId)) return;
+    // Dragging left increases outline width (right-side panel)
+    const delta = startXRef.current - e.clientX;
+    const next = Math.min(400, Math.max(160, startWidthRef.current + delta));
+    document.documentElement.style.setProperty("--outline-width", `${next}px`);
+  }, []);
+
+  const cleanupDrag = useCallback(() => {
+    document.body.style.cursor = "";
+    document.body.style.userSelect = "";
+    // Restore CSS variable to store value in case drag was aborted
+    const storeWidth = useAppStore.getState().outlineWidth;
+    document.documentElement.style.setProperty("--outline-width", `${storeWidth}px`);
+  }, []);
+
+  const handlePointerUp = useCallback((e: React.PointerEvent) => {
+    if (!(e.target as HTMLElement).hasPointerCapture(e.pointerId)) return;
+    (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+    cleanupDrag();
+    const delta = startXRef.current - e.clientX;
+    const next = Math.min(400, Math.max(160, startWidthRef.current + delta));
+    setOutlineWidth(next);
+  }, [setOutlineWidth, cleanupDrag]);
+
+  // Safety: clean up drag state if component unmounts mid-drag
+  useEffect(() => cleanupDrag, [cleanupDrag]);
+
+  const handleDoubleClick = useCallback(() => {
+    resetOutlineWidth();
+  }, [resetOutlineWidth]);
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    const store = useAppStore.getState();
+    let next: number | null = null;
+    // ArrowLeft = wider (panel is on right side)
+    if (e.key === "ArrowLeft") next = store.outlineWidth + 10;
+    else if (e.key === "ArrowRight") next = store.outlineWidth - 10;
+    else if (e.key === "Home") next = 160;
+    else if (e.key === "End") next = 400;
+    if (next !== null) {
+      e.preventDefault();
+      setOutlineWidth(next);
+    }
+  }, [setOutlineWidth]);
+
+  return (
+    <div
+      className="outline-resize-handle"
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
+      onLostPointerCapture={cleanupDrag}
+      onDoubleClick={handleDoubleClick}
+      onKeyDown={handleKeyDown}
+      role="separator"
+      aria-orientation="vertical"
+      aria-valuenow={outlineWidth}
+      aria-valuemin={160}
+      aria-valuemax={400}
+      aria-label="Resize document outline"
+      tabIndex={0}
+    />
+  );
+}
+
 export function DocumentOutline() {
   const [headings, setHeadings] = useState<HeadingEntry[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const observerRef = useRef<IntersectionObserver | null>(null);
+  const collapseRef = useRef<HTMLButtonElement>(null);
+  const railRef = useRef<HTMLButtonElement>(null);
+  const prevVisibleRef = useRef<boolean | null>(null);
+  const isFirstRender = useRef(true);
+  const pendingFocusRef = useRef<"rail" | "collapse" | null>(null);
   const outlineVisible = useAppStore((s) => s.outlineVisible);
+  const toggleOutline = useAppStore((s) => s.toggleOutline);
 
   // Extract headings from rendered content whenever it changes
   const selectedFile = useAppStore((s) => s.selectedFile);
@@ -112,6 +216,45 @@ export function DocumentOutline() {
     };
   }, [headings, outlineVisible, editMode]);
 
+  // Focus management: move focus between collapse chevron and rail on toggle.
+  // Uses a pending-focus mechanism for when the target isn't mounted yet
+  // (e.g., toggling outline while in edit mode or with no headings).
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      prevVisibleRef.current = outlineVisible;
+      return;
+    }
+    if (prevVisibleRef.current === outlineVisible) return;
+    const wasVisible = prevVisibleRef.current;
+    prevVisibleRef.current = outlineVisible;
+
+    if (wasVisible && !outlineVisible) {
+      if (railRef.current) {
+        railRef.current.focus();
+      } else {
+        pendingFocusRef.current = "rail";
+      }
+    } else if (!wasVisible && outlineVisible) {
+      if (collapseRef.current) {
+        collapseRef.current.focus();
+      } else {
+        pendingFocusRef.current = "collapse";
+      }
+    }
+  }, [outlineVisible]);
+
+  // Apply pending focus when refs become available (e.g., exiting edit mode)
+  useEffect(() => {
+    if (pendingFocusRef.current === "rail" && railRef.current) {
+      railRef.current.focus();
+      pendingFocusRef.current = null;
+    } else if (pendingFocusRef.current === "collapse" && collapseRef.current) {
+      collapseRef.current.focus();
+      pendingFocusRef.current = null;
+    }
+  });
+
   const handleClick = useCallback((id: string) => {
     const scrollContainer = document.querySelector(".preview-scroll");
     const target = document.getElementById(id);
@@ -130,8 +273,24 @@ export function DocumentOutline() {
     setActiveId(id);
   }, []);
 
-  if (!outlineVisible || headings.length === 0 || editMode) {
+  // No headings or in edit mode — show nothing
+  if (headings.length === 0 || editMode) {
     return null;
+  }
+
+  // Outline hidden but headings exist — show the rail
+  if (!outlineVisible) {
+    return (
+      <button
+        ref={railRef}
+        className="outline-rail"
+        onClick={toggleOutline}
+        aria-label="Show outline"
+        title="Show outline (⌘⇧O)"
+      >
+        <ExpandIcon />
+      </button>
+    );
   }
 
   // Determine the minimum heading level for relative indentation
@@ -139,7 +298,19 @@ export function DocumentOutline() {
 
   return (
     <nav className="document-outline" aria-label="Document outline">
-      <div className="outline-header">Contents</div>
+      <OutlineResizeHandle />
+      <div className="outline-header">
+        <span>Contents</span>
+        <button
+          ref={collapseRef}
+          className="outline-collapse-btn"
+          onClick={toggleOutline}
+          aria-label="Close outline"
+          title="Close outline (⌘⇧O)"
+        >
+          <CollapseIcon />
+        </button>
+      </div>
       <div className="outline-list">
         {headings.map((h, i) => (
           <button

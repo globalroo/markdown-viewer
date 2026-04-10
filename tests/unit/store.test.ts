@@ -26,6 +26,7 @@ function resetStore() {
     sidebarFontSize: "medium",
     sidebarWidth: 280,
     outlineVisible: true,
+    outlineWidth: 200,
     customCSSPath: null,
     customCSSContent: "",
     openTabs: [],
@@ -927,6 +928,36 @@ describe("useAppStore", () => {
       const twilight = THEMES.find((t) => t.id === "twilight-reader");
       expect(twilight).toBeDefined();
       expect(twilight!.group).toBe("reading");
+    });
+  });
+
+  describe("outlineWidth", () => {
+    it("setOutlineWidth clamps to min 160", () => {
+      useAppStore.getState().setOutlineWidth(100);
+      expect(useAppStore.getState().outlineWidth).toBe(160);
+    });
+
+    it("setOutlineWidth clamps to max 400", () => {
+      useAppStore.getState().setOutlineWidth(500);
+      expect(useAppStore.getState().outlineWidth).toBe(400);
+    });
+
+    it("setOutlineWidth accepts values within range", () => {
+      useAppStore.getState().setOutlineWidth(250);
+      expect(useAppStore.getState().outlineWidth).toBe(250);
+    });
+
+    it("resetOutlineWidth resets to 200", () => {
+      useAppStore.getState().setOutlineWidth(350);
+      useAppStore.getState().resetOutlineWidth();
+      expect(useAppStore.getState().outlineWidth).toBe(200);
+    });
+
+    it("width persists across toggleOutline on/off", () => {
+      useAppStore.getState().setOutlineWidth(300);
+      useAppStore.getState().toggleOutline(); // off
+      useAppStore.getState().toggleOutline(); // on
+      expect(useAppStore.getState().outlineWidth).toBe(300);
     });
   });
 

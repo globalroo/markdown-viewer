@@ -1207,7 +1207,8 @@ body {
   .preview-save-btn,
   .context-menu,
   .context-menu-backdrop,
-  .document-outline {
+  .document-outline,
+  .outline-rail {
     display: none !important;
   }
 
@@ -1679,7 +1680,8 @@ body {
 .focus-mode .tab-bar,
 .focus-mode .preview-header,
 .focus-mode .progress-bar-track,
-.focus-mode .document-outline {
+.focus-mode .document-outline,
+.focus-mode .outline-rail {
   display: none !important;
 }
 
@@ -1818,7 +1820,7 @@ body {
    ======================================== */
 
 .document-outline {
-  width: 200px;
+  width: var(--outline-width, 200px);
   min-width: 160px;
   flex-shrink: 0;
   background: var(--bg-sidebar);
@@ -1826,9 +1828,49 @@ body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  position: relative;
+}
+
+/* Outline resize handle */
+.outline-resize-handle {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 10;
+  touch-action: none;
+}
+
+.outline-resize-handle::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 2px;
+  height: 100%;
+  background: transparent;
+  transition: background 0.15s;
+}
+
+.outline-resize-handle:hover::after,
+.outline-resize-handle:active::after {
+  background: var(--accent, var(--border-focus));
+}
+
+.outline-resize-handle:focus-visible {
+  outline: none;
+}
+
+.outline-resize-handle:focus-visible::after {
+  background: var(--accent, var(--border-focus));
 }
 
 .outline-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   padding: 8px 12px;
   font-size: 11px;
   font-weight: 600;
@@ -1837,6 +1879,42 @@ body {
   color: var(--text-muted);
   border-bottom: 1px solid var(--border-color);
   flex-shrink: 0;
+}
+
+.outline-collapse-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  padding: 2px;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  transition: color 0.15s;
+}
+
+.outline-collapse-btn:hover {
+  color: var(--text-primary);
+}
+
+/* Closed-state rail */
+.outline-rail {
+  width: 24px;
+  flex-shrink: 0;
+  background: var(--bg-sidebar);
+  border: none;
+  border-left: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--text-muted);
+  transition: color 0.15s, background 0.15s;
+}
+
+.outline-rail:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
 }
 
 .outline-list {

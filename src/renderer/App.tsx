@@ -206,16 +206,18 @@ function useSidebarLayout() {
   const sidebarWidth = useAppStore((s) => s.sidebarWidth);
   const sidebarFontSize = useAppStore((s) => s.sidebarFontSize);
   const fontSize = useAppStore((s) => s.fontSize);
+  const outlineWidth = useAppStore((s) => s.outlineWidth);
 
   useEffect(() => {
     const root = document.documentElement;
     root.style.setProperty("--sidebar-width", `${sidebarWidth}px`);
+    root.style.setProperty("--outline-width", `${outlineWidth}px`);
     const zoomFactor = fontSize / 16;
     // Compute small base, then ensure medium and large are always distinct
     const smallPx = Math.max(9, Math.round(SIDEBAR_FONT_BASE.small * zoomFactor));
     const sizes = { small: smallPx, medium: smallPx + 1, large: smallPx + 3 };
     root.style.setProperty("--sidebar-font-size", `${sizes[sidebarFontSize]}px`);
-  }, [sidebarWidth, sidebarFontSize, fontSize]);
+  }, [sidebarWidth, sidebarFontSize, fontSize, outlineWidth]);
 }
 
 const CUSTOM_CSS_STYLE_ID = "custom-user-css";
