@@ -259,8 +259,10 @@ export function DocumentOutline() {
     setActiveId(id);
   }, []);
 
-  // Determine if we have anything to show
-  const hasContent = headings.length > 0 || (rightPanelView === "links" && linkGraph && selectedFile);
+  // Determine if we have anything to show in either view
+  const hasHeadings = headings.length > 0;
+  const hasLinks = linkGraph && selectedFile && (linkGraph.outgoing?.length > 0 || linkGraph.incoming?.length > 0);
+  const hasContent = hasHeadings || hasLinks;
 
   // Nothing to show in either view — hide completely
   if (!hasContent || editMode) {
@@ -289,20 +291,18 @@ export function DocumentOutline() {
     <nav className="document-outline" aria-label="Document outline">
       <OutlineResizeHandle />
       <div className="outline-header">
-        <div className="outline-segmented-control" role="tablist">
+        <div className="outline-segmented-control">
           <button
             className={`outline-segment${rightPanelView === "outline" ? " active" : ""}`}
             onClick={() => setRightPanelView("outline")}
-            role="tab"
-            aria-selected={rightPanelView === "outline"}
+            aria-pressed={rightPanelView === "outline"}
           >
             Contents
           </button>
           <button
             className={`outline-segment${rightPanelView === "links" ? " active" : ""}`}
             onClick={() => setRightPanelView("links")}
-            role="tab"
-            aria-selected={rightPanelView === "links"}
+            aria-pressed={rightPanelView === "links"}
           >
             Links
           </button>
