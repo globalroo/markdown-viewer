@@ -1,6 +1,6 @@
 {
   "name": "markdown-viewer",
-  "version": "1.6.2",
+  "version": "1.6.3",
   "description": "A cross-platform desktop app for discovering and reading markdown files",
   "main": "dist/main/main.js",
   "author": "globalroo <globalroo@hotmail.com>",

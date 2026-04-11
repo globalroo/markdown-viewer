@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.6.3] - 2026-04-11
+
+### Fixed
+
+- **PDF export links** — PDF export no longer appends raw URLs in brackets after link text. Links are clickable in PDFs so the URL display was redundant and wrapped badly across lines. Paper printing via Cmd+P still shows URLs for readability.
+
 ## [1.6.2] - 2026-04-11
 
 ### Fixed
