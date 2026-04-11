@@ -71,6 +71,19 @@ const api = {
   saveFoldState: (filePath: string, state: Record<string, boolean>): Promise<void> =>
     ipcRenderer.invoke("fold-state:save", filePath, state),
 
+  getLinkGraph: (filePath: string) =>
+    ipcRenderer.invoke("get-link-graph", filePath),
+
+  getConnectedPaths: (filePath: string, hops: number): Promise<string[]> =>
+    ipcRenderer.invoke("get-connected-paths", filePath, hops),
+
+  onLinkGraphChanged: (callback: (affectedPaths: string[]) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, affectedPaths: string[]) =>
+      callback(affectedPaths);
+    ipcRenderer.on("link-graph-changed", handler);
+    return () => ipcRenderer.removeListener("link-graph-changed", handler);
+  },
+
   onFileOpened: (callback: (filePath: string) => void) => {
     const handler = (_event: Electron.IpcRendererEvent, filePath: string) =>
       callback(filePath);

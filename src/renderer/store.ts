@@ -133,6 +133,11 @@ interface AppState {
   // Preview mode
   previewMode: "standard" | "collapsible";
 
+  // Link intelligence
+  linkGraph: any | null;
+  linksFilterActive: boolean;
+  linksFilterHops: 1 | 2;
+
   addProject: (rootPath: string, tree: TreeNode[]) => void;
   removeProject: (id: string) => void;
   toggleProject: (id: string) => void;
@@ -191,6 +196,11 @@ interface AppState {
   // Preview mode actions
   setPreviewMode: (mode: "standard" | "collapsible") => void;
 
+  // Link intelligence actions
+  setLinkGraph: (graph: any | null) => void;
+  toggleLinksFilter: () => void;
+  setLinksFilterHops: (hops: 1 | 2) => void;
+
   // Tree mutation after rename/move
   updateProjectTree: (projectId: string, tree: TreeNode[], oldPath?: string, newPath?: string) => void;
 }
@@ -226,6 +236,9 @@ export const useAppStore = create<AppState>((set) => ({
   styleCheckEnabled: false,
   sectionModel: null,
   previewMode: "standard",
+  linkGraph: null,
+  linksFilterActive: false,
+  linksFilterHops: 1,
 
   addProject: (rootPath, tree) =>
     set((state) => {
@@ -448,6 +461,10 @@ export const useAppStore = create<AppState>((set) => ({
   setSectionModel: (model) => set({ sectionModel: model }),
 
   setPreviewMode: (mode) => set({ previewMode: mode }),
+
+  setLinkGraph: (graph) => set({ linkGraph: graph }),
+  toggleLinksFilter: () => set((state) => ({ linksFilterActive: !state.linksFilterActive })),
+  setLinksFilterHops: (hops) => set({ linksFilterHops: hops }),
 
   updateProjectTree: (projectId, tree, oldPath, newPath) =>
     set((state) => {

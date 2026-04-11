@@ -11,6 +11,14 @@ import * as path from "path";
 import * as fs from "fs";
 import { pathToFileURL } from "url";
 import { embedLocalImages } from "./embedLocalImages";
+import {
+  type LinkIndexState,
+  buildLinkIndex,
+  updateLinkIndexForFile,
+  removeFileFromIndex,
+  getLinkGraph,
+  getConnectedPaths,
+} from "./linkIndex";
 
 let mainWindow: BrowserWindow | null = null;
 let pendingFilePath: string | null = null;
@@ -100,6 +108,23 @@ function flushFoldState(): void {
   foldStateDirty = false;
 }
 
+// --- Link index ---
+let linkIndex: LinkIndexState | null = null;
+
+function rebuildLinkIndex(): void {
+  const roots = Array.from(allowedRoots);
+  if (roots.length === 0) {
+    linkIndex = null;
+    return;
+  }
+  linkIndex = buildLinkIndex(roots, collectMarkdownFiles);
+}
+
+function notifyLinkGraphChanged(affectedPaths: Set<string>): void {
+  if (!mainWindow || affectedPaths.size === 0) return;
+  mainWindow.webContents.send("link-graph-changed", Array.from(affectedPaths));
+}
+
 // Track allowed project roots for IPC path validation
 const allowedRoots = new Set<string>();
 
@@ -161,12 +186,15 @@ function startWatching(rootPath: string): void {
       const isMarkdown = /\.(md|markdown|mdown|mkd|mkdn)$/i.test(filename);
 
       if (eventType === "rename") {
-        // A file/directory was added, removed, or renamed — refresh the tree
+        // A file/directory was added, removed, or renamed — refresh tree + link index
         debounced(`tree:${rootPath}`, 150, () => {
           if (!mainWindow) return;
           try {
             const tree = scanDirectory(rootPath);
             mainWindow.webContents.send("tree-changed", rootPath, tree);
+            // Rebuild link index for this root (new/removed files change the graph)
+            rebuildLinkIndex();
+            notifyLinkGraphChanged(new Set(["*"])); // broad notification
           } catch {
             // Directory may have been removed
           }
@@ -174,12 +202,16 @@ function startWatching(rootPath: string): void {
       }
 
       if (eventType === "change" && isMarkdown) {
-        // File content changed — notify renderer
+        // File content changed — notify renderer and update link index
         debounced(`file:${fullPath}`, 150, () => {
           if (!mainWindow) return;
           try {
             const content = readFileContent(fullPath);
             mainWindow.webContents.send("file-changed", fullPath, content);
+            if (linkIndex) {
+              const affected = updateLinkIndexForFile(linkIndex, fullPath, content);
+              notifyLinkGraphChanged(affected);
+            }
           } catch {
             // File may have been deleted between event and read
           }
@@ -393,6 +425,11 @@ ipcMain.handle("open-folder", async () => {
   addAllowedRoot(dirPath);
   const tree = scanDirectory(dirPath);
   startWatching(dirPath);
+  // Build/rebuild link index in background (non-blocking)
+  setTimeout(() => {
+    rebuildLinkIndex();
+    notifyLinkGraphChanged(new Set(["*"]));
+  }, 0);
   return { rootPath: dirPath, tree };
 });
 
@@ -442,6 +479,16 @@ ipcMain.handle(
     }
 
     fs.renameSync(oldPath, newPath);
+    // Update link index: remove old path, re-index at new path
+    if (linkIndex) {
+      const affected = removeFileFromIndex(linkIndex, oldPath);
+      try {
+        const content = fs.readFileSync(newPath, "utf-8");
+        const affected2 = updateLinkIndexForFile(linkIndex, newPath, content);
+        for (const p of affected2) affected.add(p);
+      } catch { /* ignore */ }
+      notifyLinkGraphChanged(affected);
+    }
     return { newPath };
   }
 );
@@ -478,6 +525,16 @@ ipcMain.handle(
       }
     }
 
+    // Update link index: remove old path, re-index at new path
+    if (linkIndex) {
+      const affected = removeFileFromIndex(linkIndex, sourcePath);
+      try {
+        const content = fs.readFileSync(newPath, "utf-8");
+        const affected2 = updateLinkIndexForFile(linkIndex, newPath, content);
+        for (const p of affected2) affected.add(p);
+      } catch { /* ignore */ }
+      notifyLinkGraphChanged(affected);
+    }
     return { newPath };
   }
 );
@@ -490,12 +547,20 @@ ipcMain.handle(
       throw new Error("Can only write markdown files");
     }
     fs.writeFileSync(filePath, content, "utf-8");
+    // Update link index (also serves as Linux fallback since fs.watch is disabled there)
+    if (linkIndex) {
+      const affected = updateLinkIndexForFile(linkIndex, filePath, content);
+      notifyLinkGraphChanged(affected);
+    }
   }
 );
 
 ipcMain.handle("remove-root", async (_event, rootPath: string) => {
   stopWatching(rootPath);
   removeAllowedRoot(rootPath);
+  // Rebuild link index without the removed root
+  rebuildLinkIndex();
+  notifyLinkGraphChanged(new Set(["*"]));
 });
 
 // Content search across all markdown files in given roots
@@ -746,6 +811,19 @@ ipcMain.handle("fold-state:save", async (_event, filePath: string, headingIds: R
   store.entries[normalized] = { headingIds, lastAccessed: Date.now() };
   foldStateDirty = true;
   scheduleFoldStateWrite();
+});
+
+// --- Link graph IPC handlers ---
+ipcMain.handle("get-link-graph", async (_event, filePath: string) => {
+  if (!isPathAllowed(filePath)) throw new Error("Access denied");
+  if (!linkIndex) return null;
+  return getLinkGraph(linkIndex, path.normalize(filePath));
+});
+
+ipcMain.handle("get-connected-paths", async (_event, filePath: string, hops: number) => {
+  if (!isPathAllowed(filePath)) throw new Error("Access denied");
+  if (!linkIndex) return [];
+  return getConnectedPaths(linkIndex, path.normalize(filePath), hops);
 });
 
 // Find the first real file/directory path in an argv slice, skipping Chromium flags.
