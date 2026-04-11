@@ -565,11 +565,21 @@ ipcMain.handle("export-pdf", async (): Promise<void> => {
     filters: [{ name: "PDF", extensions: ["pdf"] }],
   });
   if (result.canceled || !result.filePath) return;
-  const pdfData = await mainWindow.webContents.printToPDF({
-    printBackground: true,
-    margins: { marginType: "default" },
-  });
-  fs.writeFileSync(result.filePath, pdfData);
+  // Add pdf-export class to suppress ::after URL display (links are clickable in PDFs)
+  await mainWindow.webContents.executeJavaScript(
+    'document.documentElement.classList.add("pdf-export")'
+  );
+  try {
+    const pdfData = await mainWindow.webContents.printToPDF({
+      printBackground: true,
+      margins: { marginType: "default" },
+    });
+    fs.writeFileSync(result.filePath, pdfData);
+  } finally {
+    await mainWindow.webContents.executeJavaScript(
+      'document.documentElement.classList.remove("pdf-export")'
+    );
+  }
 });
 
 ipcMain.handle(

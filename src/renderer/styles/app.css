@@ -1465,6 +1465,11 @@ body {
     content: none;
   }
 
+  /* PDF export: links are clickable, so hide the appended URL */
+  .pdf-export .preview-content a[href]::after {
+    content: none;
+  }
+
   /* ── Page Break Control ── */
 
   .preview-content li {
