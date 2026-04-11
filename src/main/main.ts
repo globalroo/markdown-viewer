@@ -479,9 +479,11 @@ ipcMain.handle(
     }
 
     fs.renameSync(oldPath, newPath);
-    // Update link index: remove old path, re-index at new path
+    // Update link index: remove old path, re-index at new path, refresh backers
     if (linkIndex) {
       const affected = removeFileFromIndex(linkIndex, oldPath);
+      // Re-index files that linked to the old path so their edges update
+      reindexBackersOf(oldPath, affected);
       try {
         const content = fs.readFileSync(newPath, "utf-8");
         const affected2 = updateLinkIndexForFile(linkIndex, newPath, content);
@@ -525,9 +527,10 @@ ipcMain.handle(
       }
     }
 
-    // Update link index: remove old path, re-index at new path
+    // Update link index: remove old path, re-index at new path, refresh backers
     if (linkIndex) {
       const affected = removeFileFromIndex(linkIndex, sourcePath);
+      reindexBackersOf(sourcePath, affected);
       try {
         const content = fs.readFileSync(newPath, "utf-8");
         const affected2 = updateLinkIndexForFile(linkIndex, newPath, content);
@@ -812,6 +815,20 @@ ipcMain.handle("fold-state:save", async (_event, filePath: string, headingIds: R
   foldStateDirty = true;
   scheduleFoldStateWrite();
 });
+
+/** Re-index files that had forward links pointing to the given target path */
+function reindexBackersOf(targetPath: string, affected: Set<string>): void {
+  if (!linkIndex) return;
+  const backers = linkIndex.backLinks.get(targetPath);
+  if (!backers || backers.size === 0) return;
+  for (const backer of Array.from(backers)) {
+    try {
+      const content = fs.readFileSync(backer, "utf-8");
+      const a = updateLinkIndexForFile(linkIndex, backer, content);
+      for (const p of a) affected.add(p);
+    } catch { /* file may have been deleted */ }
+  }
+}
 
 // --- Link graph IPC handlers ---
 ipcMain.handle("get-link-graph", async (_event, filePath: string) => {
