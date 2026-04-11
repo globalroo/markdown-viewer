@@ -2252,6 +2252,76 @@ body {
   opacity: 0.5;
 }
 
+/* ========================================
+   Connected Files Filter
+   ======================================== */
+
+.links-filter-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  margin: 0 8px 4px;
+  background: var(--accent-subtle, var(--bg-selected));
+  border: 1px solid var(--accent, var(--border-color));
+  border-radius: 16px;
+  font-size: 11px;
+  color: var(--accent, var(--text-primary));
+  flex-shrink: 0;
+}
+
+.links-filter-hops {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+  padding: 0 2px;
+  font-size: 10px;
+  color: inherit;
+  cursor: pointer;
+}
+
+.links-filter-clear {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: inherit;
+  padding: 1px;
+  display: flex;
+  align-items: center;
+  opacity: 0.7;
+}
+
+.links-filter-clear:hover {
+  opacity: 1;
+}
+
+.links-filter-toggle {
+  padding: 4px 12px 8px;
+}
+
+.links-filter-btn {
+  width: 100%;
+  padding: 4px 8px;
+  background: none;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s, border-color 0.1s;
+}
+
+.links-filter-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.links-filter-btn.active {
+  background: var(--accent-subtle, var(--bg-selected));
+  border-color: var(--accent, var(--border-color));
+  color: var(--accent, var(--text-primary));
+}
+
 .collapsible-search-indicator {
   color: var(--accent, var(--text-link));
   font-style: italic;

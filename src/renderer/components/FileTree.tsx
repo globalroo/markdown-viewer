@@ -21,20 +21,22 @@ function buildCountMap(nodes: TreeNode[], map: Map<string, number>): void {
   }
 }
 
-function filterTree(nodes: TreeNode[], query: string): TreeNode[] {
-  if (!query) return nodes;
-  const lower = query.toLowerCase();
+function filterTree(nodes: TreeNode[], query: string, connectedPaths?: Set<string>): TreeNode[] {
+  if (!query && !connectedPaths) return nodes;
+  const lower = query ? query.toLowerCase() : "";
 
   return nodes
     .map((node) => {
       if (node.type === "file") {
-        return node.name.toLowerCase().includes(lower) ? node : null;
+        const matchesQuery = !query || node.name.toLowerCase().includes(lower);
+        const matchesConnected = !connectedPaths || connectedPaths.has(node.path);
+        return matchesQuery && matchesConnected ? node : null;
       }
-      const filteredChildren = filterTree(node.children || [], query);
+      const filteredChildren = filterTree(node.children || [], query, connectedPaths);
       if (filteredChildren.length > 0) {
         return { ...node, children: filteredChildren };
       }
-      if (node.name.toLowerCase().includes(lower)) {
+      if (query && node.name.toLowerCase().includes(lower)) {
         return node;
       }
       return null;
@@ -292,14 +294,16 @@ export function FileTree({
   tree,
   searchQuery,
   projectRootPath,
+  connectedPaths,
 }: {
   tree: TreeNode[];
   searchQuery: string;
   projectRootPath: string;
+  connectedPaths?: Set<string>;
 }) {
   const filteredTree = useMemo(
-    () => filterTree(tree, searchQuery),
-    [tree, searchQuery]
+    () => filterTree(tree, searchQuery, connectedPaths),
+    [tree, searchQuery, connectedPaths]
   );
 
   // Compute counts from the ORIGINAL tree so badges are stable during search

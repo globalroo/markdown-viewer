@@ -74,9 +74,24 @@ export function LinksPanel() {
   }
 
   const { outgoing, incoming, outgoingContexts, incomingContexts } = linkGraph;
+  const linksFilterActive = useAppStore((s) => s.linksFilterActive);
+  const toggleLinksFilter = useAppStore((s) => s.toggleLinksFilter);
+  const totalLinks = outgoing.length + incoming.length;
 
   return (
     <div className="links-panel-body">
+      {totalLinks > 0 && (
+        <div className="links-filter-toggle">
+          <button
+            className={`links-filter-btn${linksFilterActive ? " active" : ""}`}
+            onClick={toggleLinksFilter}
+            aria-pressed={linksFilterActive}
+            title="Filter sidebar to show only linked files"
+          >
+            {linksFilterActive ? "Showing linked files" : "Filter to linked files"}
+          </button>
+        </div>
+      )}
       <div className="links-section">
         <div className="links-section-header">
           Outgoing ({outgoing.length})
