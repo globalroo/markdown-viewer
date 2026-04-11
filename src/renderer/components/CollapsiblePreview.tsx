@@ -226,12 +226,16 @@ export function CollapsiblePreview({ sectionModel, selectedFile, onClick }: Coll
       setFocusedId(null);
       setSearchExpanded(false);
       preSearchStateRef.current = null;
+      // Reset heading ref so diffHeadingIds doesn't cross-pollinate files
+      prevHeadingsRef.current = sectionModel.flatHeadings;
       prevFileRef.current = selectedFile;
     }
     // Load saved fold state — use generation counter to discard stale results
     const gen = ++loadGenRef.current;
     window.api.loadFoldState(selectedFile).then((saved) => {
       if (gen !== loadGenRef.current) return; // stale — user switched files during load
+      // Skip if user already interacted (pending save for this file)
+      if (pendingSaveRef.current?.file === selectedFile) return;
       if (saved) {
         const restored = new Set<string>();
         for (const [id, expanded] of Object.entries(saved)) {
@@ -242,12 +246,13 @@ export function CollapsiblePreview({ sectionModel, selectedFile, onClick }: Coll
         setExpandedSet(new Set());
       }
     });
-  }, [selectedFile, flushPendingSave]);
+  }, [selectedFile, flushPendingSave, sectionModel.flatHeadings]);
 
-  // Transfer fold state when document headings change (editing)
+  // Transfer fold state when document headings change (same-file editing only)
   useEffect(() => {
     const prev = prevHeadingsRef.current;
     const next = sectionModel.flatHeadings;
+    // Only transfer if headings changed for the same file (not a file switch)
     if (prev !== next && prev.length > 0 && next.length > 0) {
       const mapping = diffHeadingIds(prev, next);
       if (mapping.size > 0) {
@@ -257,7 +262,6 @@ export function CollapsiblePreview({ sectionModel, selectedFile, onClick }: Coll
             const newId = mapping.get(id);
             if (newId) transferred.add(newId);
           }
-          // Save transferred state so it persists
           scheduleSave(selectedFile, transferred);
           return transferred;
         });
