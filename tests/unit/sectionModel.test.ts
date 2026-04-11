@@ -3,21 +3,21 @@ import { buildSectionModel, diffHeadingIds } from "../../src/renderer/utils/sect
 
 describe("buildSectionModel", () => {
   it("handles empty document", () => {
-    const model = buildSectionModel("");
+    const model = buildSectionModel("", "test.md");
     expect(model.sections).toHaveLength(0);
     expect(model.flatHeadings).toHaveLength(0);
     expect(model.preamble).toHaveLength(0);
   });
 
   it("handles document with no headings", () => {
-    const model = buildSectionModel("Hello world\n\nSome paragraph text.");
+    const model = buildSectionModel("Hello world\n\nSome paragraph text.", "test.md");
     expect(model.sections).toHaveLength(0);
     expect(model.flatHeadings).toHaveLength(0);
     expect(model.preamble.length).toBeGreaterThan(0);
   });
 
   it("handles single heading", () => {
-    const model = buildSectionModel("# Title\n\nBody text.");
+    const model = buildSectionModel("# Title\n\nBody text.", "test.md");
     expect(model.sections).toHaveLength(1);
     expect(model.flatHeadings).toHaveLength(1);
     expect(model.flatHeadings[0].text).toBe("Title");
@@ -26,7 +26,7 @@ describe("buildSectionModel", () => {
   });
 
   it("handles preamble before first heading", () => {
-    const model = buildSectionModel("Preamble text\n\n# Title\n\nBody.");
+    const model = buildSectionModel("Preamble text\n\n# Title\n\nBody.", "test.md");
     expect(model.preamble.length).toBeGreaterThan(0);
     expect(model.sections).toHaveLength(1);
     expect(model.flatHeadings[0].text).toBe("Title");
@@ -34,7 +34,7 @@ describe("buildSectionModel", () => {
 
   it("handles multiple same-level headings as siblings", () => {
     const md = "# First\n\nA\n\n# Second\n\nB\n\n# Third\n\nC";
-    const model = buildSectionModel(md);
+    const model = buildSectionModel(md, "test.md");
     expect(model.sections).toHaveLength(3);
     expect(model.sections[0].heading.text).toBe("First");
     expect(model.sections[1].heading.text).toBe("Second");
@@ -47,7 +47,7 @@ describe("buildSectionModel", () => {
 
   it("handles h1 > h2 nesting correctly", () => {
     const md = "# Parent\n\n## Child A\n\nA text\n\n## Child B\n\nB text";
-    const model = buildSectionModel(md);
+    const model = buildSectionModel(md, "test.md");
     expect(model.sections).toHaveLength(1);
     expect(model.sections[0].heading.text).toBe("Parent");
     expect(model.sections[0].children).toHaveLength(2);
@@ -57,7 +57,7 @@ describe("buildSectionModel", () => {
 
   it("handles h1 > h2 > h3 deep nesting", () => {
     const md = "# Top\n\n## Mid\n\n### Deep\n\nContent";
-    const model = buildSectionModel(md);
+    const model = buildSectionModel(md, "test.md");
     expect(model.sections).toHaveLength(1);
     expect(model.sections[0].children).toHaveLength(1);
     expect(model.sections[0].children[0].children).toHaveLength(1);
@@ -66,7 +66,7 @@ describe("buildSectionModel", () => {
 
   it("handles mixed levels: h1, h1, h2, h2, h3", () => {
     const md = "# A\n\n# B\n\n## B1\n\n## B2\n\n### B2a";
-    const model = buildSectionModel(md);
+    const model = buildSectionModel(md, "test.md");
     expect(model.sections).toHaveLength(2);
     expect(model.sections[0].heading.text).toBe("A");
     expect(model.sections[0].children).toHaveLength(0);
@@ -80,7 +80,7 @@ describe("buildSectionModel", () => {
 
   it("handles skipped levels (h1 > h3)", () => {
     const md = "# Title\n\n### Skipped to h3\n\nContent";
-    const model = buildSectionModel(md);
+    const model = buildSectionModel(md, "test.md");
     expect(model.sections).toHaveLength(1);
     // h3 is deeper than h1, so it becomes a child
     expect(model.sections[0].children).toHaveLength(1);
@@ -89,7 +89,7 @@ describe("buildSectionModel", () => {
 
   it("handles duplicate heading text", () => {
     const md = "## Setup\n\nA\n\n## Setup\n\nB";
-    const model = buildSectionModel(md);
+    const model = buildSectionModel(md, "test.md");
     expect(model.sections).toHaveLength(2);
     // Both have "Setup" text but different IDs due to positional index
     expect(model.flatHeadings[0].text).toBe("Setup");
@@ -99,7 +99,7 @@ describe("buildSectionModel", () => {
 
   it("stamps _canonicalId on heading tokens", () => {
     const md = "# Title\n\n## Sub";
-    const model = buildSectionModel(md);
+    const model = buildSectionModel(md, "test.md");
     const headingTokens = model.annotatedTokens.filter(
       (t: any) => t.type === "heading"
     );
@@ -110,14 +110,14 @@ describe("buildSectionModel", () => {
 
   it("generates stable IDs with format slug-L{level}-{index}", () => {
     const md = "# Hello World\n\n## Sub Section";
-    const model = buildSectionModel(md);
+    const model = buildSectionModel(md, "test.md");
     expect(model.flatHeadings[0].id).toBe("hello-world-L1-0");
     expect(model.flatHeadings[1].id).toBe("sub-section-L2-1");
   });
 
   it("counts raw lines correctly", () => {
     const md = "# Title\n\nLine 1\nLine 2\nLine 3\n\nAnother paragraph.";
-    const model = buildSectionModel(md);
+    const model = buildSectionModel(md, "test.md");
     expect(model.sections[0].rawLineCount).toBeGreaterThan(0);
   });
 });

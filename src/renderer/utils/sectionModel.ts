@@ -15,6 +15,7 @@ export interface Section {
 }
 
 export interface SectionModel {
+  sourceFile: string;
   preamble: Token[];
   sections: Section[];
   flatHeadings: SectionHeading[];
@@ -58,7 +59,7 @@ function getPlainText(token: Tokens.Heading): string {
  * Returns annotatedTokens (the full token list with IDs stamped) so the
  * renderer can pass them to marked.parser() for standard-mode rendering.
  */
-export function buildSectionModel(content: string): SectionModel {
+export function buildSectionModel(content: string, sourceFile: string): SectionModel {
   const tokens = marked.lexer(content) as TokensList;
   const flatHeadings: SectionHeading[] = [];
   let positionalIndex = 0;
@@ -145,6 +146,7 @@ export function buildSectionModel(content: string): SectionModel {
   const { sections } = nestSections(flatSections, 0, 0);
 
   return {
+    sourceFile,
     preamble,
     sections,
     flatHeadings,

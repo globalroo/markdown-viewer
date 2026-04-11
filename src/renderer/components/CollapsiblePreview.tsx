@@ -252,7 +252,9 @@ export function CollapsiblePreview({ sectionModel, selectedFile, onClick }: Coll
   useEffect(() => {
     const prev = prevHeadingsRef.current;
     const next = sectionModel.flatHeadings;
-    // Only transfer if headings changed for the same file (not a file switch)
+    // Only transfer if the section model belongs to the currently selected file
+    // (sectionModel can lag behind selectedFile during async content load)
+    if (sectionModel.sourceFile !== selectedFile) return;
     if (prev !== next && prev.length > 0 && next.length > 0) {
       const mapping = diffHeadingIds(prev, next);
       if (mapping.size > 0) {

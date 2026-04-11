@@ -382,7 +382,7 @@ export function MarkdownPreview() {
   // Build section model from markdown content (shared by CollapsiblePreview and DocumentOutline)
   const sectionModel = useMemo<SectionModel | null>(() => {
     if (!previewSource || !selectedFile) return null;
-    return buildSectionModel(previewSource);
+    return buildSectionModel(previewSource, selectedFile);
   }, [previewSource, selectedFile]);
 
   // Push section model to store so DocumentOutline can consume it
