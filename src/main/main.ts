@@ -10,6 +10,7 @@ import {
 import * as path from "path";
 import * as fs from "fs";
 import { pathToFileURL } from "url";
+import { embedLocalImages } from "./embedLocalImages";
 
 let mainWindow: BrowserWindow | null = null;
 let pendingFilePath: string | null = null;
@@ -546,12 +547,14 @@ ipcMain.handle(
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Exported Document</title>
 <style>${cssContent}</style>
+<style>/* Standalone override — undo app-layout scroll constraints */
+html, body { height: auto !important; overflow: auto !important; }</style>
 </head>
 <body>
 <div class="preview-content">${html}</div>
 </body>
 </html>`;
-    fs.writeFileSync(result.filePath, doc, "utf-8");
+    fs.writeFileSync(result.filePath, embedLocalImages(doc, isPathAllowed), "utf-8");
   }
 );
 
@@ -591,9 +594,10 @@ ipcMain.handle(
 <div class="preview-content">${html}</div>
 </body>
 </html>`;
+    const embeddedHtml = embedLocalImages(fullHtml, isPathAllowed);
     const htmlDocxModule = await import("html-docx-js");
     const htmlDocx = htmlDocxModule.default || htmlDocxModule;
-    const docxResult = htmlDocx.asBlob(fullHtml);
+    const docxResult = htmlDocx.asBlob(embeddedHtml);
     // html-docx-js returns Buffer in Node, Blob in browser — handle both
     let bytes: Buffer;
     if (Buffer.isBuffer(docxResult)) {

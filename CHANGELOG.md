@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.6.2] - 2026-04-11
+
+### Fixed
+
+- **HTML export scroll** — exported HTML no longer clips content below the fold. Standalone override resets `height: auto; overflow: auto` after the app CSS.
+- **PDF export background** — PDF output now has a clean white background regardless of active reading theme. Added `background: #fff !important` to `@media print` on `html, body, #root`.
+- **DOCX/HTML image embedding** — images are now embedded as base64 data URIs instead of referencing `file://` paths. Word no longer prompts for filesystem permissions. New `embedLocalImages` utility in the main process reads files and validates against `isPathAllowed`.
+- **Export URL encoding** — `local-img://` to `file://` conversion now uses a simple protocol swap instead of decode+reconstruct, preventing breakage on filenames containing `#` or `?`.
+
+### Changed
+
+- **"Style" renamed to "Prose"** — writing quality checker button renamed to avoid confusion with font/typography styling. Duplicate button removed from the preview header.
+- **Settings icon** — replaced sun/rays icon with a proper gear cog for clarity.
+- **Contents toggle** — toolbar button now shows an active/pressed state when the contents panel is open. Label changed from "Outline" to "Contents" for consistency with the panel header. Icon changed to a table-of-contents bullet list.
+
+### Added
+
+- 12 unit tests for `embedLocalImages` (MIME types, security gate, fallbacks, encoding).
+- 3 E2E tests for export fixes (HTML scroll, PDF white background, DOCX image embedding).
+
 ## [1.6.1] - 2026-04-11
 
 ### Fixed

@@ -76,6 +76,12 @@ body {
   transition: background 0.15s, color 0.15s;
 }
 
+.toolbar-btn.active {
+  background: var(--bg-hover);
+  border-color: var(--border-color);
+  color: var(--accent, var(--text-primary));
+}
+
 .toolbar-btn:hover {
   background: var(--bg-hover);
   border-color: var(--border-color);
@@ -1217,6 +1223,7 @@ body {
   html, body, #root {
     height: auto;
     overflow: visible;
+    background: #fff !important;
   }
 
   .app {

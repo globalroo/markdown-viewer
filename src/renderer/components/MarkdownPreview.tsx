@@ -619,10 +619,9 @@ export function MarkdownPreview() {
   const handleExportHTML = useCallback(async () => {
     if (!html) return;
     // Rewrite local-img:// protocol URLs back to file:// for portability
-    const portableHtml = html.replace(/local-img:\/\/([^"')\s]+)/g, (_match, encoded) => {
-      const decoded = decodeURIComponent(encoded);
-      return "file://" + decoded;
-    });
+    // Keep paths URL-encoded so embedLocalImages can parse them correctly
+    // (decoding here would break filenames containing # or ?)
+    const portableHtml = html.replace(/local-img:\/\//g, "file://");
     // Gather computed styles for the preview
     const styleSheets = Array.from(document.styleSheets);
     let css = "";
@@ -651,10 +650,9 @@ export function MarkdownPreview() {
 
   const handleExportDOCX = useCallback(async () => {
     if (!html) return;
-    const portableHtml = html.replace(/local-img:\/\/([^"')\s]+)/g, (_match, encoded) => {
-      const decoded = decodeURIComponent(encoded);
-      return "file://" + decoded;
-    });
+    // Keep paths URL-encoded so embedLocalImages can parse them correctly
+    // (decoding here would break filenames containing # or ?)
+    const portableHtml = html.replace(/local-img:\/\//g, "file://");
     const styleSheets = Array.from(document.styleSheets);
     let css = "";
     for (const sheet of styleSheets) {
@@ -746,13 +744,6 @@ export function MarkdownPreview() {
               Save
             </button>
           )}
-          <button
-            className={`preview-copy-btn style-check-toggle${styleCheckEnabled ? " active" : ""}`}
-            onClick={toggleStyleCheck}
-            title={`Style check ${styleCheckEnabled ? "on" : "off"}`}
-          >
-            Style
-          </button>
           <button
             className="preview-copy-btn"
             onClick={handleCopy}

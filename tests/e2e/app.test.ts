@@ -52,17 +52,17 @@ test.beforeAll(() => {
       "",
       '<p><img src="images/test.png" alt="HTML test" width="32" height="32"></p>',
       "",
-      "## External image",
+      "## External image (1x1 transparent pixel via https)",
       "",
-      "![External](https://example.com/does-not-exist.png)",
+      "![External](https://upload.wikimedia.org/wikipedia/commons/c/ce/Transparent.gif)",
       "",
       "## Protocol-relative image (HTML)",
       "",
-      '<p><img src="//cdn.example.com/proto-rel.png" alt="ProtoRel"></p>',
+      '<p><img src="//upload.wikimedia.org/wikipedia/commons/c/ce/Transparent.gif" alt="ProtoRel"></p>',
       "",
       "## Protocol-relative image (markdown)",
       "",
-      "![MdProtoRel](//cdn.example.com/md-proto-rel.png)",
+      "![MdProtoRel](//upload.wikimedia.org/wikipedia/commons/c/ce/Transparent.gif)",
       "",
       "## Pre-encoded URL (markdown)",
       "",
@@ -1576,4 +1576,100 @@ test("markdown-syntax pre-encoded image URL is not double-encoded", async () => 
   // %20 should appear (space encoded), but %2520 (double-encoded) must not
   expect(src).toContain("my%20file.png");
   expect(src).not.toContain("%2520");
+});
+
+// ---------------------------------------------------------------------------
+// 61. HTML export has scrollable overflow (not clipped)
+// ---------------------------------------------------------------------------
+
+test("HTML export includes scroll override styles", async () => {
+  await openTestFolder();
+  await selectFileByName("README.md");
+
+  // Mock the save dialog to write to a temp file
+  const exportPath = path.join(testDir, "export-test.html");
+  await app.evaluate(async ({ dialog }, savePath) => {
+    dialog.showSaveDialog = async () => ({
+      canceled: false,
+      filePath: savePath,
+    });
+  }, exportPath);
+
+  // Click the HTML export button
+  await page.click('.preview-copy-btn:text-is("HTML")');
+
+  // Wait for the file to be written
+  await page.waitForTimeout(1000);
+
+  const htmlContent = fs.readFileSync(exportPath, "utf-8");
+  // The standalone override style block should be present
+  expect(htmlContent).toContain("height: auto !important");
+  expect(htmlContent).toContain("overflow: auto !important");
+});
+
+// ---------------------------------------------------------------------------
+// 62. PDF print media forces white background on body
+// ---------------------------------------------------------------------------
+
+test("PDF print media forces white background on body even with coloured theme", async () => {
+  await openTestFolder();
+  await selectFileByName("README.md");
+
+  // Apply Sepia theme (has coloured background)
+  await page.click('[aria-label="Open settings"]');
+  await expect(page.locator(".settings-panel")).toBeVisible();
+  const sepiaSwatch = page.locator('.theme-swatch', { has: page.locator('.swatch-label:text-is("Sepia")') });
+  await sepiaSwatch.click();
+  await page.keyboard.press("Escape");
+
+  // Emulate print media
+  await page.emulateMedia({ media: "print" });
+
+  // Body should be white regardless of Sepia theme
+  const bodyBg = await page.locator("body").evaluate((el) =>
+    getComputedStyle(el).backgroundColor
+  );
+  expect(bodyBg).toBe("rgb(255, 255, 255)");
+});
+
+// ---------------------------------------------------------------------------
+// 63. DOCX export embeds images as base64 (no file:// references)
+// ---------------------------------------------------------------------------
+
+test("DOCX export embeds images as base64 data URIs", async () => {
+  await openTestFolder();
+  await selectFileByName("images.md");
+
+  // Wait for preview to render
+  await expect(page.locator(".preview-content")).toBeVisible();
+
+  // Mock the save dialog
+  const exportPath = path.join(testDir, "export-test.docx");
+  await app.evaluate(async ({ dialog }, savePath) => {
+    dialog.showSaveDialog = async () => ({
+      canceled: false,
+      filePath: savePath,
+    });
+  }, exportPath);
+
+  // Click the DOCX export button
+  await page.click('.preview-copy-btn:text-is("DOCX")');
+
+  // Wait for the file to be written
+  await page.waitForTimeout(2000);
+
+  // DOCX from html-docx-js is a ZIP containing word/afchunk.mht.
+  // html-docx-js converts data: URIs into MHTML multipart boundaries with
+  // synthetic Content-Location headers (file:///C:/fake/...), so the final
+  // MHT won't contain literal "data:image/png;base64," strings. Instead
+  // verify: (1) the base64 image bytes are embedded, (2) no real filesystem
+  // file:// URLs survive (only the synthetic C:/fake/ ones from html-docx-js).
+  const { execSync } = require("child_process");
+  const mhtContent = execSync(`unzip -p "${exportPath}" word/afchunk.mht`, { encoding: "utf-8" });
+  // PNG base64 starts with iVBORw0KGgo (magic bytes 0x89504e47)
+  expect(mhtContent).toContain("iVBORw0KGgo");
+  // No real filesystem paths — only html-docx-js synthetic C:/fake/ paths allowed
+  const realFileUrls = mhtContent.match(/file:\/\/[^"'\s\r\n]+/g) || [];
+  const leakedPaths = realFileUrls.filter((u: string) => !u.includes("/C:/fake/"));
+  expect(leakedPaths).toEqual([]);
 });

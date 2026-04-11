@@ -9,11 +9,14 @@ interface HeadingEntry {
 
 function OutlineIcon() {
   return (
-    <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-      <line x1="3" y1="3" x2="13" y2="3" />
-      <line x1="5" y1="6" x2="13" y2="6" />
-      <line x1="5" y1="9" x2="13" y2="9" />
-      <line x1="3" y1="12" x2="13" y2="12" />
+    <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+      {/* Table of contents: bullets + indented lines */}
+      <circle cx="3" cy="3" r="1" fill="currentColor" stroke="none" />
+      <line x1="6" y1="3" x2="14" y2="3" />
+      <circle cx="5" cy="7" r="1" fill="currentColor" stroke="none" />
+      <line x1="8" y1="7" x2="14" y2="7" />
+      <circle cx="5" cy="11" r="1" fill="currentColor" stroke="none" />
+      <line x1="8" y1="11" x2="14" y2="11" />
     </svg>
   );
 }
