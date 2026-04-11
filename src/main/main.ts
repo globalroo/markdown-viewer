@@ -569,6 +569,8 @@ ipcMain.handle(
       throw new Error("Can only write markdown files");
     }
     fs.writeFileSync(filePath, content, "utf-8");
+    // Update lastViewed so the file doesn't appear stale to its backers
+    lastViewed.set(path.normalize(filePath), Date.now());
     // Update link index (also serves as Linux fallback since fs.watch is disabled there)
     if (linkIndex) {
       const affected = updateLinkIndexForFile(linkIndex, filePath, content);
