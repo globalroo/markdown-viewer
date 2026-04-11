@@ -196,6 +196,10 @@ interface AppState {
   // Preview mode actions
   setPreviewMode: (mode: "standard" | "collapsible") => void;
 
+  // Right panel
+  rightPanelView: "outline" | "links";
+  setRightPanelView: (view: "outline" | "links") => void;
+
   // Link intelligence actions
   setLinkGraph: (graph: any | null) => void;
   toggleLinksFilter: () => void;
@@ -236,6 +240,7 @@ export const useAppStore = create<AppState>((set) => ({
   styleCheckEnabled: false,
   sectionModel: null,
   previewMode: "standard",
+  rightPanelView: "outline",
   linkGraph: null,
   linksFilterActive: false,
   linksFilterHops: 1,
@@ -462,6 +467,7 @@ export const useAppStore = create<AppState>((set) => ({
 
   setPreviewMode: (mode) => set({ previewMode: mode }),
 
+  setRightPanelView: (view) => set({ rightPanelView: view }),
   setLinkGraph: (graph) => set({ linkGraph: graph }),
   toggleLinksFilter: () => set((state) => ({ linksFilterActive: !state.linksFilterActive })),
   setLinksFilterHops: (hops) => set({ linksFilterHops: hops }),

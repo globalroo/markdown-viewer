@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { useAppStore } from "../store";
+import { LinksPanel } from "./LinksPanel";
 
 interface HeadingEntry {
   id: string;
@@ -133,6 +134,10 @@ export function DocumentOutline() {
   const toggleOutline = useAppStore((s) => s.toggleOutline);
   const editMode = useAppStore((s) => s.editMode);
   const previewMode = useAppStore((s) => s.previewMode);
+  const rightPanelView = useAppStore((s) => s.rightPanelView);
+  const setRightPanelView = useAppStore((s) => s.setRightPanelView);
+  const selectedFile = useAppStore((s) => s.selectedFile);
+  const linkGraph = useAppStore((s) => s.linkGraph);
 
   // Derive headings from the shared section model (replaces DOM scraping)
   const sectionModel = useAppStore((s) => s.sectionModel);
@@ -254,12 +259,15 @@ export function DocumentOutline() {
     setActiveId(id);
   }, []);
 
-  // No headings or in edit mode — show nothing
-  if (headings.length === 0 || editMode) {
+  // Determine if we have anything to show
+  const hasContent = headings.length > 0 || (rightPanelView === "links" && linkGraph && selectedFile);
+
+  // Nothing to show in either view — hide completely
+  if (!hasContent || editMode) {
     return null;
   }
 
-  // Outline hidden but headings exist — show the rail
+  // Panel hidden — show the rail
   if (!outlineVisible) {
     return (
       <button
@@ -281,7 +289,24 @@ export function DocumentOutline() {
     <nav className="document-outline" aria-label="Document outline">
       <OutlineResizeHandle />
       <div className="outline-header">
-        <span>Contents</span>
+        <div className="outline-segmented-control" role="tablist">
+          <button
+            className={`outline-segment${rightPanelView === "outline" ? " active" : ""}`}
+            onClick={() => setRightPanelView("outline")}
+            role="tab"
+            aria-selected={rightPanelView === "outline"}
+          >
+            Contents
+          </button>
+          <button
+            className={`outline-segment${rightPanelView === "links" ? " active" : ""}`}
+            onClick={() => setRightPanelView("links")}
+            role="tab"
+            aria-selected={rightPanelView === "links"}
+          >
+            Links
+          </button>
+        </div>
         <button
           ref={collapseRef}
           className="outline-collapse-btn"
@@ -292,19 +317,27 @@ export function DocumentOutline() {
           <CollapseIcon />
         </button>
       </div>
-      <div className="outline-list">
-        {headings.map((h, i) => (
-          <button
-            key={`${h.id}-${i}`}
-            className={`outline-item ${activeId === h.id ? "active" : ""}`}
-            style={{ paddingLeft: `${8 + (h.level - minLevel) * 12}px` }}
-            onClick={() => handleClick(h.id)}
-            title={h.text}
-          >
-            <span className="outline-item-text">{h.text}</span>
-          </button>
-        ))}
-      </div>
+      {rightPanelView === "links" ? (
+        <LinksPanel />
+      ) : (
+        <div className="outline-list">
+          {headings.length > 0 ? (
+            headings.map((h, i) => (
+              <button
+                key={`${h.id}-${i}`}
+                className={`outline-item ${activeId === h.id ? "active" : ""}`}
+                style={{ paddingLeft: `${8 + (h.level - minLevel) * 12}px` }}
+                onClick={() => handleClick(h.id)}
+                title={h.text}
+              >
+                <span className="outline-item-text">{h.text}</span>
+              </button>
+            ))
+          ) : (
+            <div className="outline-empty">No headings</div>
+          )}
+        </div>
+      )}
     </nav>
   );
 }
