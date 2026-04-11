@@ -37,6 +37,11 @@ function filterTree(nodes: TreeNode[], query: string, connectedPaths?: Set<strin
         return { ...node, children: filteredChildren };
       }
       if (query && node.name.toLowerCase().includes(lower)) {
+        // Directory name matches search, but still apply connected paths filter
+        if (connectedPaths) {
+          const connectedChildren = filterTree(node.children || [], "", connectedPaths);
+          return connectedChildren.length > 0 ? { ...node, children: connectedChildren } : null;
+        }
         return node;
       }
       return null;

@@ -351,7 +351,7 @@ function ContentSearchResults({
 }
 
 export function Sidebar() {
-  const { projects, searchQuery, setSearchQuery, sidebarVisible, linksFilterActive, toggleLinksFilter, linksFilterHops, setLinksFilterHops, selectedFile } = useAppStore();
+  const { projects, searchQuery, setSearchQuery, sidebarVisible, linksFilterActive, toggleLinksFilter, linksFilterHops, setLinksFilterHops, selectedFile, linkGraph } = useAppStore();
   const [contentSearchMode, setContentSearchMode] = useState(false);
   const [contentResults, setContentResults] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -370,7 +370,7 @@ export function Sidebar() {
       if (!cancelled) setConnectedPaths(new Set(paths));
     });
     return () => { cancelled = true; };
-  }, [linksFilterActive, selectedFile, linksFilterHops]);
+  }, [linksFilterActive, selectedFile, linksFilterHops, linkGraph]);
 
   const handleAddFolder = useCallback(async () => {
     const result = await window.api.openFolder();
