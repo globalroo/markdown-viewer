@@ -857,6 +857,7 @@ app.on("open-file", (_event, filePath) => {
     const dirPath = path.dirname(filePath);
     addAllowedRoot(dirPath);
     startWatching(dirPath);
+    setTimeout(() => { rebuildLinkIndex(); notifyLinkGraphChanged(new Set(["*"])); }, 0);
     mainWindow.webContents.send("file-opened", filePath);
   } else {
     pendingFilePath = filePath;
@@ -887,6 +888,7 @@ if (!gotLock) {
         const dirPath = stat.isDirectory() ? target : path.dirname(target);
         addAllowedRoot(dirPath);
         startWatching(dirPath);
+        setTimeout(() => { rebuildLinkIndex(); notifyLinkGraphChanged(new Set(["*"])); }, 0);
         if (stat.isDirectory()) {
           mainWindow.webContents.send("open-directory", target);
         } else {
@@ -942,6 +944,7 @@ app.whenReady().then(() => {
       const dirPath = stat.isDirectory() ? initialPath : path.dirname(initialPath);
       addAllowedRoot(dirPath);
       startWatching(dirPath);
+      setTimeout(() => { rebuildLinkIndex(); notifyLinkGraphChanged(new Set(["*"])); }, 0);
     } catch {
       // ignore
     }

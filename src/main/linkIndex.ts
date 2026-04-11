@@ -236,6 +236,24 @@ function indexFileContent(state: LinkIndexState, filePath: string, content: stri
   }
 }
 
+/** Add a file path to the filename lookup */
+function addToFilenameLookup(lookup: Map<string, string[]>, filePath: string): void {
+  const stem = path.basename(filePath, path.extname(filePath)).toLowerCase();
+  const list = lookup.get(stem) || [];
+  if (!list.includes(filePath)) list.push(filePath);
+  lookup.set(stem, list);
+}
+
+/** Remove a file path from the filename lookup */
+function removeFromFilenameLookup(lookup: Map<string, string[]>, filePath: string): void {
+  const stem = path.basename(filePath, path.extname(filePath)).toLowerCase();
+  const list = lookup.get(stem);
+  if (!list) return;
+  const idx = list.indexOf(filePath);
+  if (idx !== -1) list.splice(idx, 1);
+  if (list.length === 0) lookup.delete(stem);
+}
+
 /**
  * Incrementally update the index for a single changed file.
  * Returns the set of files whose link graph was affected.
@@ -263,6 +281,9 @@ export function updateLinkIndexForFile(
   state.forwardLinks.delete(filePath);
   state.linkContexts.delete(filePath);
 
+  // Ensure file is in the filename lookup
+  addToFilenameLookup(state.filenameLookup, filePath);
+
   // Re-index with new content
   indexFileContent(state, filePath, newContent);
 
@@ -281,6 +302,9 @@ export function updateLinkIndexForFile(
 export function removeFileFromIndex(state: LinkIndexState, filePath: string): Set<string> {
   const affected = new Set<string>();
   affected.add(filePath);
+
+  // Remove from filename lookup
+  removeFromFilenameLookup(state.filenameLookup, filePath);
 
   const oldTargets = state.forwardLinks.get(filePath);
   if (oldTargets) {
