@@ -132,6 +132,7 @@ export function DocumentOutline() {
   const outlineVisible = useAppStore((s) => s.outlineVisible);
   const toggleOutline = useAppStore((s) => s.toggleOutline);
   const editMode = useAppStore((s) => s.editMode);
+  const previewMode = useAppStore((s) => s.previewMode);
 
   // Derive headings from the shared section model (replaces DOM scraping)
   const sectionModel = useAppStore((s) => s.sectionModel);
@@ -185,18 +186,16 @@ export function DocumentOutline() {
       }
     );
 
-    const container = document.querySelector(".preview-content");
-    if (!container) return;
-
-    const els = container.querySelectorAll("h1, h2, h3, h4, h5, h6");
-    els.forEach((el) => {
-      if (el.id) observerRef.current!.observe(el);
+    // Observe headings by ID — works for both standard (h1-h6) and collapsible (span[role=heading])
+    headings.forEach((h) => {
+      const el = document.getElementById(h.id);
+      if (el) observerRef.current!.observe(el);
     });
 
     return () => {
       observerRef.current?.disconnect();
     };
-  }, [headings, outlineVisible, editMode]);
+  }, [headings, outlineVisible, editMode, previewMode]);
 
   // Focus management: move focus between collapse chevron and rail on toggle.
   // Uses a pending-focus mechanism for when the target isn't mounted yet

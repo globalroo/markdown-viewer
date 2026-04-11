@@ -109,6 +109,9 @@ function useKeyboardShortcuts() {
           if (e.shiftKey) {
             e.preventDefault();
             state.toggleFocusMode();
+          } else if (state.previewMode === "collapsible") {
+            // In collapsible mode, let native browser find work by not intercepting
+            // The CollapsiblePreview component handles expanding sections for search
           } else {
             e.preventDefault();
             const searchInput =

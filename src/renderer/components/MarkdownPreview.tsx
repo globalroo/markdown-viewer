@@ -9,6 +9,7 @@ import { useAppStore } from "../store";
 import { analyzeText, computeReadability, type StyleIssue } from "../utils/styleCheck";
 import { resolveLocalImageSrc } from "../utils/resolveLocalImageSrc";
 import { buildSectionModel, type SectionModel } from "../utils/sectionModel";
+import { CollapsiblePreview } from "./CollapsiblePreview";
 import { WIKI_LINK_PATTERN } from "../../shared/linkPatterns";
 
 // Register only the most common languages to keep bundle small
@@ -273,6 +274,7 @@ export function MarkdownPreview() {
   const setEditContent = useAppStore((s) => s.setEditContent);
   const styleCheckEnabled = useAppStore((s) => s.styleCheckEnabled);
   const toggleStyleCheck = useAppStore((s) => s.toggleStyleCheck);
+  const previewMode = useAppStore((s) => s.previewMode);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [copyFeedback, setCopyFeedback] = useState(false);
@@ -365,16 +367,15 @@ export function MarkdownPreview() {
     // Initialize from current scroll position (e.g. returning from edit mode)
     updateProgress();
     el.addEventListener("scroll", updateProgress, { passive: true });
-    // Observe the content child for reflows from width/height/font changes
-    const content = el.querySelector(".preview-content");
+    // Observe content and collapsible wrapper for reflows on expand/collapse
     const observer = new ResizeObserver(updateProgress);
-    if (content) observer.observe(content);
+    el.querySelectorAll(".preview-content, .collapsible-preview").forEach((c) => observer.observe(c));
     observer.observe(el);
     return () => {
       el.removeEventListener("scroll", updateProgress);
       observer.disconnect();
     };
-  }, [selectedFile, editMode]);
+  }, [selectedFile, editMode, previewMode]);
 
   // Render draft content when dirty, otherwise saved content
   const previewSource = editDirty ? editContent : markdownContent;
@@ -395,6 +396,15 @@ export function MarkdownPreview() {
     return renderMarkdownFromModel(sectionModel, selectedFile);
   }, [sectionModel, selectedFile]);
 
+  // In collapsible mode, strip heading IDs from the hidden standard content
+  // to avoid duplicate IDs in the DOM (collapsible sections have their own IDs)
+  const viewHtml = useMemo(() => {
+    if (previewMode === "collapsible" && html) {
+      return html.replace(/<(h[1-6])\s+id="[^"]*"/g, "<$1");
+    }
+    return html;
+  }, [html, previewMode]);
+
   // Style check: analyse text and compute readability when enabled
   const styleIssues = useMemo<StyleIssue[]>(() => {
     if (!styleCheckEnabled || !previewSource) return [];
@@ -410,11 +420,11 @@ export function MarkdownPreview() {
   // We walk text nodes in the preview DOM after render and wrap matched
   // ranges with <mark> elements.  This avoids mutating the markdown source.
   useEffect(() => {
-    const container = scrollRef.current?.querySelector(".preview-content");
-    // Cleanup function: unwrap any existing style marks
+    const scrollContainer = scrollRef.current;
+    // Cleanup function: unwrap any existing style marks in all preview-content containers
     const removeMarks = () => {
-      if (!container) return;
-      const marks = container.querySelectorAll("mark.style-issue");
+      if (!scrollContainer) return;
+      const marks = scrollContainer.querySelectorAll("mark.style-issue");
       marks.forEach((mark) => {
         const parent = mark.parentNode;
         if (parent) {
@@ -427,7 +437,10 @@ export function MarkdownPreview() {
       removeMarks();
       return removeMarks;
     }
-    if (!container) return;
+    if (!scrollContainer) return;
+    // Get all preview-content containers (standard + collapsible sections)
+    const containers = scrollContainer.querySelectorAll<HTMLElement>(".preview-content");
+    if (containers.length === 0) return;
 
     // Build a set of issue texts grouped by type for quick lookup.
     // We match on the rendered text content, not markdown positions.
@@ -456,7 +469,8 @@ export function MarkdownPreview() {
       }
     }
 
-    // Walk text nodes and wrap matches
+    // Walk text nodes and wrap matches in all preview-content containers
+    for (const container of containers) {
     const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, {
       acceptNode: (node) => {
         // Skip nodes inside <code>, <pre>, <script>, <style>, and existing marks
@@ -519,34 +533,61 @@ export function MarkdownPreview() {
         }
       }
     }
+    } // end containers loop
     return removeMarks;
   }, [html, styleCheckEnabled, editMode, styleIssues]);
 
-  // Render Mermaid diagrams after DOM update
+  // Render Mermaid diagrams after DOM update.
+  // Uses MutationObserver to also catch blocks added by collapsible section expansion.
   useEffect(() => {
-    if (editMode || !html) return;
+    if (editMode) return;
     const container = scrollRef.current;
     if (!container) return;
-    const blocks = container.querySelectorAll<HTMLElement>(".mermaid-block[data-mermaid]");
-    if (blocks.length === 0) return;
 
     let cancelled = false;
-    import("mermaid").then(({ default: mermaid }) => {
-      if (cancelled) return;
-      mermaid.initialize({ startOnLoad: false, theme: "default", securityLevel: "strict" });
+    let mermaidModule: any = null;
+
+    const processMermaidBlocks = (root: Element | Document = container) => {
+      const blocks = root.querySelectorAll<HTMLElement>(".mermaid-block[data-mermaid]");
+      if (blocks.length === 0 || !mermaidModule) return;
       blocks.forEach(async (block, i) => {
-        if (cancelled) return;
+        if (cancelled || block.dataset.mermaidRendered) return;
+        block.dataset.mermaidRendered = "true";
         const source = decodeURIComponent(block.dataset.mermaid || "");
         try {
-          const { svg } = await mermaid.render(`mermaid-${i}-${Date.now()}`, source);
+          const { svg } = await mermaidModule.render(`mermaid-${i}-${Date.now()}`, source);
           if (!cancelled) block.innerHTML = svg;
         } catch {
           // Leave the raw text visible on parse error
         }
       });
+    };
+
+    import("mermaid").then(({ default: mermaid }) => {
+      if (cancelled) return;
+      mermaidModule = mermaid;
+      mermaid.initialize({ startOnLoad: false, theme: "default", securityLevel: "strict" });
+      processMermaidBlocks();
     });
-    return () => { cancelled = true; };
-  }, [html, editMode]);
+
+    // Watch for new mermaid blocks added by collapsible section expansion
+    const observer = new MutationObserver((mutations) => {
+      if (!mermaidModule) return;
+      for (const mutation of mutations) {
+        for (const node of mutation.addedNodes) {
+          if (node instanceof Element) {
+            processMermaidBlocks(node);
+          }
+        }
+      }
+    });
+    observer.observe(container, { childList: true, subtree: true });
+
+    return () => {
+      cancelled = true;
+      observer.disconnect();
+    };
+  }, [html, editMode, previewMode]);
 
   // Word count and reading time
   const { wordCount, readingTime } = useMemo(() => {
@@ -825,10 +866,17 @@ export function MarkdownPreview() {
             spellCheck={false}
           />
         )}
+        {!editMode && previewMode === "collapsible" && sectionModel && (
+          <CollapsiblePreview
+            sectionModel={sectionModel}
+            selectedFile={selectedFile!}
+            onClick={handlePreviewClick}
+          />
+        )}
         <div
-          className="preview-content"
-          style={editMode ? { display: "none" } : undefined}
-          dangerouslySetInnerHTML={{ __html: html }}
+          className={`preview-content${previewMode === "collapsible" && sectionModel ? " preview-content-hidden" : ""}`}
+          style={editMode || (previewMode === "collapsible" && sectionModel) ? { display: "none" } : undefined}
+          dangerouslySetInnerHTML={{ __html:viewHtml }}
           onClick={handlePreviewClick}
         />
       </div>
