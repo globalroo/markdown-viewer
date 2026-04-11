@@ -125,6 +125,9 @@ function notifyLinkGraphChanged(affectedPaths: Set<string>): void {
   mainWindow.webContents.send("link-graph-changed", Array.from(affectedPaths));
 }
 
+// --- Last-viewed tracking (for stale link detection) ---
+const lastViewed = new Map<string, number>();
+
 // Track allowed project roots for IPC path validation
 const allowedRoots = new Set<string>();
 
@@ -445,6 +448,7 @@ ipcMain.handle(
   "read-file",
   async (_event, filePath: string): Promise<string> => {
     if (!isPathAllowed(filePath)) throw new Error("Access denied");
+    lastViewed.set(path.normalize(filePath), Date.now());
     return readFileContent(filePath);
   }
 );
@@ -835,7 +839,17 @@ ipcMain.handle("fold-state:save", async (_event, filePath: string, headingIds: R
 ipcMain.handle("get-link-graph", async (_event, filePath: string) => {
   if (!isPathAllowed(filePath)) throw new Error("Access denied");
   if (!linkIndex) return null;
-  return getLinkGraph(linkIndex, path.normalize(filePath));
+  const graph = getLinkGraph(linkIndex, path.normalize(filePath));
+  // Annotate with stale status: target was modified after user last viewed it
+  const staleTargets: Record<string, boolean> = {};
+  for (const target of graph.outgoing) {
+    const status = graph.outgoingStatus[target];
+    if (status?.exists && status.lastModified) {
+      const viewedAt = lastViewed.get(target);
+      staleTargets[target] = viewedAt ? status.lastModified > viewedAt : false;
+    }
+  }
+  return { ...graph, staleTargets };
 });
 
 ipcMain.handle("get-connected-paths", async (_event, filePath: string, hops: number) => {

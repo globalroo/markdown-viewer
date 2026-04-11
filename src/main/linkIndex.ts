@@ -30,11 +30,17 @@ export interface LinkContext {
   text: string;
 }
 
+export interface LinkStatus {
+  exists: boolean;
+  lastModified: number | null;
+}
+
 export interface LinkGraph {
   outgoing: string[];
   incoming: string[];
   outgoingContexts: Record<string, LinkContext[]>;
   incomingContexts: Record<string, LinkContext[]>;
+  outgoingStatus: Record<string, LinkStatus>;
 }
 
 export interface LinkIndexState {
@@ -354,7 +360,18 @@ export function getLinkGraph(state: LinkIndexState, filePath: string): LinkGraph
     }
   }
 
-  return { outgoing, incoming, outgoingContexts, incomingContexts };
+  // Check existence and modification time for each outgoing link
+  const outgoingStatus: Record<string, LinkStatus> = {};
+  for (const target of outgoing) {
+    try {
+      const stat = fs.statSync(target);
+      outgoingStatus[target] = { exists: true, lastModified: stat.mtimeMs };
+    } catch {
+      outgoingStatus[target] = { exists: false, lastModified: null };
+    }
+  }
+
+  return { outgoing, incoming, outgoingContexts, incomingContexts, outgoingStatus };
 }
 
 /**
