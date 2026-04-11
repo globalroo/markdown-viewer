@@ -324,6 +324,7 @@ export function removeFileFromIndex(state: LinkIndexState, filePath: string): Se
   const backers = state.backLinks.get(filePath);
   if (backers) {
     for (const backer of backers) affected.add(backer);
+    state.backLinks.delete(filePath);
   }
 
   return affected;
