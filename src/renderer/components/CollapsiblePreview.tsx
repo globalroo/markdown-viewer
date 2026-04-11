@@ -172,7 +172,10 @@ export function CollapsiblePreview({ sectionModel, selectedFile, onClick }: Coll
   const pendingSaveRef = useRef<{ file: string; state: Record<string, boolean> } | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevFileRef = useRef(selectedFile);
-  const prevHeadingsRef = useRef<SectionHeading[]>(sectionModel.flatHeadings);
+  const prevModelRef = useRef<{ sourceFile: string; flatHeadings: SectionHeading[] }>({
+    sourceFile: sectionModel.sourceFile,
+    flatHeadings: sectionModel.flatHeadings,
+  });
   const loadGenRef = useRef(0); // generation counter to prevent stale async loads
   const fileDir = selectedFile.replace(/[/\\][^/\\]+$/, "");
   const links = sectionModel.annotatedTokens.links || {};
@@ -226,8 +229,6 @@ export function CollapsiblePreview({ sectionModel, selectedFile, onClick }: Coll
       setFocusedId(null);
       setSearchExpanded(false);
       preSearchStateRef.current = null;
-      // Reset heading ref so diffHeadingIds doesn't cross-pollinate files
-      prevHeadingsRef.current = sectionModel.flatHeadings;
       prevFileRef.current = selectedFile;
     }
     // Load saved fold state — use generation counter to discard stale results
@@ -248,29 +249,34 @@ export function CollapsiblePreview({ sectionModel, selectedFile, onClick }: Coll
     });
   }, [selectedFile, flushPendingSave, sectionModel.flatHeadings]);
 
-  // Transfer fold state when document headings change (same-file editing only)
+  // Transfer fold state when headings change within the SAME file (editing only).
+  // Uses prevModelRef to track both sourceFile and headings, so cross-file
+  // transitions never trigger a diff — even when sectionModel lags selectedFile.
   useEffect(() => {
-    const prev = prevHeadingsRef.current;
-    const next = sectionModel.flatHeadings;
-    // Only transfer if the section model belongs to the currently selected file
-    // (sectionModel can lag behind selectedFile during async content load)
-    if (sectionModel.sourceFile !== selectedFile) return;
-    if (prev !== next && prev.length > 0 && next.length > 0) {
-      const mapping = diffHeadingIds(prev, next);
-      if (mapping.size > 0) {
-        setExpandedSet((current) => {
-          const transferred = new Set<string>();
-          for (const id of current) {
-            const newId = mapping.get(id);
-            if (newId) transferred.add(newId);
-          }
-          scheduleSave(selectedFile, transferred);
-          return transferred;
-        });
-      }
+    const prev = prevModelRef.current;
+    const next = { sourceFile: sectionModel.sourceFile, flatHeadings: sectionModel.flatHeadings };
+    // Always update the ref (unconditionally) so it never gets stuck
+    prevModelRef.current = next;
+
+    // Only diff if both models belong to the same file AND it's the active file
+    if (prev.sourceFile !== next.sourceFile) return;
+    if (prev.sourceFile !== selectedFile) return;
+    if (prev.flatHeadings === next.flatHeadings) return;
+    if (prev.flatHeadings.length === 0 || next.flatHeadings.length === 0) return;
+
+    const mapping = diffHeadingIds(prev.flatHeadings, next.flatHeadings);
+    if (mapping.size > 0) {
+      setExpandedSet((current) => {
+        const transferred = new Set<string>();
+        for (const id of current) {
+          const newId = mapping.get(id);
+          if (newId) transferred.add(newId);
+        }
+        scheduleSave(selectedFile, transferred);
+        return transferred;
+      });
     }
-    prevHeadingsRef.current = next;
-  }, [sectionModel.flatHeadings, selectedFile, scheduleSave]);
+  }, [sectionModel, selectedFile, scheduleSave]);
 
   const toggle = useCallback((id: string) => {
     setExpandedSet((prev) => {
