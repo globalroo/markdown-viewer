@@ -127,6 +127,12 @@ interface AppState {
   // Style check
   styleCheckEnabled: boolean;
 
+  // Section model (shared by CollapsiblePreview and DocumentOutline)
+  sectionModel: import("./utils/sectionModel").SectionModel | null;
+
+  // Preview mode
+  previewMode: "standard" | "collapsible";
+
   addProject: (rootPath: string, tree: TreeNode[]) => void;
   removeProject: (id: string) => void;
   toggleProject: (id: string) => void;
@@ -179,6 +185,12 @@ interface AppState {
   // Style check actions
   toggleStyleCheck: () => void;
 
+  // Section model actions
+  setSectionModel: (model: import("./utils/sectionModel").SectionModel | null) => void;
+
+  // Preview mode actions
+  setPreviewMode: (mode: "standard" | "collapsible") => void;
+
   // Tree mutation after rename/move
   updateProjectTree: (projectId: string, tree: TreeNode[], oldPath?: string, newPath?: string) => void;
 }
@@ -212,6 +224,8 @@ export const useAppStore = create<AppState>((set) => ({
   openTabs: [],
   activeTab: null,
   styleCheckEnabled: false,
+  sectionModel: null,
+  previewMode: "standard",
 
   addProject: (rootPath, tree) =>
     set((state) => {
@@ -430,6 +444,10 @@ export const useAppStore = create<AppState>((set) => ({
 
   toggleStyleCheck: () =>
     set((state) => ({ styleCheckEnabled: !state.styleCheckEnabled })),
+
+  setSectionModel: (model) => set({ sectionModel: model }),
+
+  setPreviewMode: (mode) => set({ previewMode: mode }),
 
   updateProjectTree: (projectId, tree, oldPath, newPath) =>
     set((state) => {
