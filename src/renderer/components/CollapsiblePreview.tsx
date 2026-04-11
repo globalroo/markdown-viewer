@@ -166,47 +166,72 @@ export function CollapsiblePreview({ sectionModel, selectedFile, onClick }: Coll
   const [searchExpanded, setSearchExpanded] = useState(false);
   const preSearchStateRef = useRef<Set<string> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Pending save tracks the file + state that should be flushed.
+  // This avoids saving stale expandedSet during rapid file switches.
+  const pendingSaveRef = useRef<{ file: string; state: Record<string, boolean> } | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevFileRef = useRef(selectedFile);
   const prevHeadingsRef = useRef<SectionHeading[]>(sectionModel.flatHeadings);
+  const loadGenRef = useRef(0); // generation counter to prevent stale async loads
   const fileDir = selectedFile.replace(/[/\\][^/\\]+$/, "");
   const links = sectionModel.annotatedTokens.links || {};
 
-  // Save current fold state (debounced)
-  const saveFoldState = useCallback((file: string, expanded: Set<string>) => {
-    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = setTimeout(() => {
-      const state: Record<string, boolean> = {};
-      for (const id of expanded) state[id] = true;
-      window.api.saveFoldState(file, state);
-    }, 2000);
+  // Convert expanded set to record for IPC
+  const expandedToRecord = useCallback((expanded: Set<string>): Record<string, boolean> => {
+    const state: Record<string, boolean> = {};
+    for (const id of expanded) state[id] = true;
+    return state;
   }, []);
 
-  // Flush fold state immediately
-  const flushFoldState = useCallback((file: string, expanded: Set<string>) => {
+  // Schedule a debounced save — stores pending state in ref
+  const scheduleSave = useCallback((file: string, expanded: Set<string>) => {
+    pendingSaveRef.current = { file, state: expandedToRecord(expanded) };
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      saveTimerRef.current = null;
+      if (pendingSaveRef.current) {
+        window.api.saveFoldState(pendingSaveRef.current.file, pendingSaveRef.current.state);
+        pendingSaveRef.current = null;
+      }
+    }, 2000);
+  }, [expandedToRecord]);
+
+  // Flush pending save immediately (for file switch and unmount)
+  const flushPendingSave = useCallback(() => {
     if (saveTimerRef.current) {
       clearTimeout(saveTimerRef.current);
       saveTimerRef.current = null;
     }
-    const state: Record<string, boolean> = {};
-    for (const id of expanded) state[id] = true;
-    window.api.saveFoldState(file, state);
+    if (pendingSaveRef.current) {
+      window.api.saveFoldState(pendingSaveRef.current.file, pendingSaveRef.current.state);
+      pendingSaveRef.current = null;
+    }
   }, []);
+
+  // Flush on unmount and beforeunload (covers app quit within debounce window)
+  useEffect(() => {
+    const handleBeforeUnload = () => flushPendingSave();
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      flushPendingSave();
+    };
+  }, [flushPendingSave]);
 
   // Load fold state on file change, flush previous file's state
   useEffect(() => {
     if (prevFileRef.current !== selectedFile) {
-      // Flush state for the file we're leaving
-      flushFoldState(prevFileRef.current, expandedSet);
+      flushPendingSave();
       setFocusedId(null);
       setSearchExpanded(false);
       preSearchStateRef.current = null;
       prevFileRef.current = selectedFile;
     }
-    // Load saved fold state for the new file
-    let cancelled = false;
+    // Load saved fold state — use generation counter to discard stale results
+    const gen = ++loadGenRef.current;
     window.api.loadFoldState(selectedFile).then((saved) => {
-      if (cancelled) return;
+      if (gen !== loadGenRef.current) return; // stale — user switched files during load
       if (saved) {
         const restored = new Set<string>();
         for (const [id, expanded] of Object.entries(saved)) {
@@ -217,8 +242,7 @@ export function CollapsiblePreview({ sectionModel, selectedFile, onClick }: Coll
         setExpandedSet(new Set());
       }
     });
-    return () => { cancelled = true; };
-  }, [selectedFile]);
+  }, [selectedFile, flushPendingSave]);
 
   // Transfer fold state when document headings change (editing)
   useEffect(() => {
@@ -233,12 +257,14 @@ export function CollapsiblePreview({ sectionModel, selectedFile, onClick }: Coll
             const newId = mapping.get(id);
             if (newId) transferred.add(newId);
           }
+          // Save transferred state so it persists
+          scheduleSave(selectedFile, transferred);
           return transferred;
         });
       }
     }
     prevHeadingsRef.current = next;
-  }, [sectionModel.flatHeadings]);
+  }, [sectionModel.flatHeadings, selectedFile, scheduleSave]);
 
   const toggle = useCallback((id: string) => {
     setExpandedSet((prev) => {
@@ -248,26 +274,26 @@ export function CollapsiblePreview({ sectionModel, selectedFile, onClick }: Coll
       } else {
         next.add(id);
       }
-      saveFoldState(selectedFile, next);
+      scheduleSave(selectedFile, next);
       return next;
     });
-  }, [selectedFile, saveFoldState]);
+  }, [selectedFile, scheduleSave]);
 
   const expandAll = useCallback(() => {
     setNoTransition(true);
     const all = new Set(sectionModel.flatHeadings.map((h) => h.id));
     setExpandedSet(all);
-    saveFoldState(selectedFile, all);
+    scheduleSave(selectedFile, all);
     requestAnimationFrame(() => setNoTransition(false));
-  }, [sectionModel.flatHeadings, selectedFile, saveFoldState]);
+  }, [sectionModel.flatHeadings, selectedFile, scheduleSave]);
 
   const collapseAll = useCallback(() => {
     setNoTransition(true);
     const empty = new Set<string>();
     setExpandedSet(empty);
-    saveFoldState(selectedFile, empty);
+    scheduleSave(selectedFile, empty);
     requestAnimationFrame(() => setNoTransition(false));
-  }, [selectedFile, saveFoldState]);
+  }, [selectedFile, scheduleSave]);
 
   // Compute visible headings (skip children of collapsed parents)
   const visibleHeadings = useMemo(() => {
