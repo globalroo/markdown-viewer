@@ -65,6 +65,12 @@ const api = {
   searchContent: (query: string, roots: string[]): Promise<SearchResult[]> =>
     ipcRenderer.invoke("search-content", query, roots),
 
+  loadFoldState: (filePath: string): Promise<Record<string, boolean> | null> =>
+    ipcRenderer.invoke("fold-state:load", filePath),
+
+  saveFoldState: (filePath: string, state: Record<string, boolean>): Promise<void> =>
+    ipcRenderer.invoke("fold-state:save", filePath, state),
+
   onFileOpened: (callback: (filePath: string) => void) => {
     const handler = (_event: Electron.IpcRendererEvent, filePath: string) =>
       callback(filePath);

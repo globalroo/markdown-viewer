@@ -39,6 +39,67 @@ function writeConfig(config: UserConfig): void {
   fs.writeFileSync(configPath, JSON.stringify(config, null, 2), "utf-8");
 }
 
+// --- Fold state persistence ---
+interface FoldStateEntry {
+  headingIds: Record<string, boolean>;
+  lastAccessed: number;
+}
+
+interface FoldStateStore {
+  entries: Record<string, FoldStateEntry>;
+}
+
+const FOLD_STATE_MAX_ENTRIES = 300;
+
+function getFoldStatePath(): string {
+  return path.join(app.getPath("userData"), "fold-state.json");
+}
+
+let foldStateCache: FoldStateStore | null = null;
+let foldStateDirty = false;
+let foldStateTimer: ReturnType<typeof setTimeout> | null = null;
+
+function loadFoldStateStore(): FoldStateStore {
+  if (foldStateCache) return foldStateCache;
+  try {
+    const raw = fs.readFileSync(getFoldStatePath(), "utf-8");
+    foldStateCache = JSON.parse(raw) as FoldStateStore;
+    if (!foldStateCache.entries) foldStateCache.entries = {};
+  } catch {
+    foldStateCache = { entries: {} };
+  }
+  return foldStateCache;
+}
+
+function scheduleFoldStateWrite(): void {
+  if (foldStateTimer) return;
+  foldStateTimer = setTimeout(() => {
+    foldStateTimer = null;
+    flushFoldState();
+  }, 2000);
+}
+
+function flushFoldState(): void {
+  if (!foldStateDirty || !foldStateCache) return;
+  // LRU eviction
+  const keys = Object.keys(foldStateCache.entries);
+  if (keys.length > FOLD_STATE_MAX_ENTRIES) {
+    const sorted = keys.sort(
+      (a, b) => (foldStateCache!.entries[a].lastAccessed || 0) - (foldStateCache!.entries[b].lastAccessed || 0)
+    );
+    const toRemove = sorted.slice(0, keys.length - FOLD_STATE_MAX_ENTRIES);
+    for (const k of toRemove) delete foldStateCache.entries[k];
+  }
+  try {
+    const foldPath = getFoldStatePath();
+    fs.mkdirSync(path.dirname(foldPath), { recursive: true });
+    fs.writeFileSync(foldPath, JSON.stringify(foldStateCache, null, 2), "utf-8");
+  } catch {
+    // Non-critical — fold state loss is acceptable
+  }
+  foldStateDirty = false;
+}
+
 // Track allowed project roots for IPC path validation
 const allowedRoots = new Set<string>();
 
@@ -667,6 +728,26 @@ ipcMain.handle("clear-custom-css", async (): Promise<void> => {
   writeConfig(config);
 });
 
+// --- Fold state IPC handlers ---
+ipcMain.handle("fold-state:load", async (_event, filePath: string): Promise<Record<string, boolean> | null> => {
+  const store = loadFoldStateStore();
+  const normalized = path.normalize(filePath);
+  const entry = store.entries[normalized];
+  if (!entry) return null;
+  entry.lastAccessed = Date.now();
+  foldStateDirty = true;
+  scheduleFoldStateWrite();
+  return entry.headingIds;
+});
+
+ipcMain.handle("fold-state:save", async (_event, filePath: string, headingIds: Record<string, boolean>): Promise<void> => {
+  const store = loadFoldStateStore();
+  const normalized = path.normalize(filePath);
+  store.entries[normalized] = { headingIds, lastAccessed: Date.now() };
+  foldStateDirty = true;
+  scheduleFoldStateWrite();
+});
+
 // Find the first real file/directory path in an argv slice, skipping Chromium flags.
 // cwd overrides path.resolve base for relative args (used by second-instance).
 function findPathArg(args: string[], cwd?: string): string | null {
@@ -804,4 +885,5 @@ app.on("window-all-closed", () => {
 
 app.on("will-quit", () => {
   stopAllWatchers();
+  flushFoldState();
 });

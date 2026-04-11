@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { marked, type Token, type TokensList } from "marked";
 import DOMPurify from "dompurify";
 import { resolveLocalImageSrc } from "../utils/resolveLocalImageSrc";
-import type { SectionModel, Section } from "../utils/sectionModel";
+import { diffHeadingIds, type SectionModel, type Section, type SectionHeading } from "../utils/sectionModel";
 
 interface CollapsiblePreviewProps {
   sectionModel: SectionModel;
@@ -166,20 +166,79 @@ export function CollapsiblePreview({ sectionModel, selectedFile, onClick }: Coll
   const [searchExpanded, setSearchExpanded] = useState(false);
   const preSearchStateRef = useRef<Set<string> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const prevFileRef = useRef(selectedFile);
+  const prevHeadingsRef = useRef<SectionHeading[]>(sectionModel.flatHeadings);
   const fileDir = selectedFile.replace(/[/\\][^/\\]+$/, "");
   const links = sectionModel.annotatedTokens.links || {};
 
-  // Reset fold state and search state when file changes
-  const prevFileRef = useRef(selectedFile);
+  // Save current fold state (debounced)
+  const saveFoldState = useCallback((file: string, expanded: Set<string>) => {
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      const state: Record<string, boolean> = {};
+      for (const id of expanded) state[id] = true;
+      window.api.saveFoldState(file, state);
+    }, 2000);
+  }, []);
+
+  // Flush fold state immediately
+  const flushFoldState = useCallback((file: string, expanded: Set<string>) => {
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    const state: Record<string, boolean> = {};
+    for (const id of expanded) state[id] = true;
+    window.api.saveFoldState(file, state);
+  }, []);
+
+  // Load fold state on file change, flush previous file's state
   useEffect(() => {
     if (prevFileRef.current !== selectedFile) {
-      setExpandedSet(new Set());
+      // Flush state for the file we're leaving
+      flushFoldState(prevFileRef.current, expandedSet);
       setFocusedId(null);
       setSearchExpanded(false);
       preSearchStateRef.current = null;
       prevFileRef.current = selectedFile;
     }
+    // Load saved fold state for the new file
+    let cancelled = false;
+    window.api.loadFoldState(selectedFile).then((saved) => {
+      if (cancelled) return;
+      if (saved) {
+        const restored = new Set<string>();
+        for (const [id, expanded] of Object.entries(saved)) {
+          if (expanded) restored.add(id);
+        }
+        setExpandedSet(restored);
+      } else {
+        setExpandedSet(new Set());
+      }
+    });
+    return () => { cancelled = true; };
   }, [selectedFile]);
+
+  // Transfer fold state when document headings change (editing)
+  useEffect(() => {
+    const prev = prevHeadingsRef.current;
+    const next = sectionModel.flatHeadings;
+    if (prev !== next && prev.length > 0 && next.length > 0) {
+      const mapping = diffHeadingIds(prev, next);
+      if (mapping.size > 0) {
+        setExpandedSet((current) => {
+          const transferred = new Set<string>();
+          for (const id of current) {
+            const newId = mapping.get(id);
+            if (newId) transferred.add(newId);
+          }
+          return transferred;
+        });
+      }
+    }
+    prevHeadingsRef.current = next;
+  }, [sectionModel.flatHeadings]);
 
   const toggle = useCallback((id: string) => {
     setExpandedSet((prev) => {
@@ -189,21 +248,26 @@ export function CollapsiblePreview({ sectionModel, selectedFile, onClick }: Coll
       } else {
         next.add(id);
       }
+      saveFoldState(selectedFile, next);
       return next;
     });
-  }, []);
+  }, [selectedFile, saveFoldState]);
 
   const expandAll = useCallback(() => {
     setNoTransition(true);
-    setExpandedSet(new Set(sectionModel.flatHeadings.map((h) => h.id)));
+    const all = new Set(sectionModel.flatHeadings.map((h) => h.id));
+    setExpandedSet(all);
+    saveFoldState(selectedFile, all);
     requestAnimationFrame(() => setNoTransition(false));
-  }, [sectionModel.flatHeadings]);
+  }, [sectionModel.flatHeadings, selectedFile, saveFoldState]);
 
   const collapseAll = useCallback(() => {
     setNoTransition(true);
-    setExpandedSet(new Set());
+    const empty = new Set<string>();
+    setExpandedSet(empty);
+    saveFoldState(selectedFile, empty);
     requestAnimationFrame(() => setNoTransition(false));
-  }, []);
+  }, [selectedFile, saveFoldState]);
 
   // Compute visible headings (skip children of collapsed parents)
   const visibleHeadings = useMemo(() => {

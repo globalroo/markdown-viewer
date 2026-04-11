@@ -30,6 +30,8 @@ interface ElectronAPI {
   exportPDF: () => Promise<void>;
   exportDOCX: (html: string, css: string, theme?: string, font?: string, rootStyle?: string, warmFilter?: boolean) => Promise<void>;
   searchContent: (query: string, roots: string[]) => Promise<SearchResult[]>;
+  loadFoldState: (filePath: string) => Promise<Record<string, boolean> | null>;
+  saveFoldState: (filePath: string, state: Record<string, boolean>) => Promise<void>;
   loadCustomCSS: () => Promise<{ path: string; content: string } | null>;
   getCustomCSS: () => Promise<{ path: string; content: string } | null>;
   clearCustomCSS: () => Promise<void>;
