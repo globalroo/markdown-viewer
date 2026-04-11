@@ -7,6 +7,7 @@ import katex from "katex";
 import "katex/dist/katex.min.css";
 import { useAppStore } from "../store";
 import { analyzeText, computeReadability, type StyleIssue } from "../utils/styleCheck";
+import { resolveLocalImageSrc } from "../utils/resolveLocalImageSrc";
 
 // Register only the most common languages to keep bundle small
 import javascript from "highlight.js/lib/languages/javascript";
@@ -120,20 +121,7 @@ renderer.image = function (token: any) {
   const alt: string = token.text || "";
   const title: string = token.title || "";
 
-  let resolvedSrc = src;
-  if (!src.startsWith("http://") && !src.startsWith("https://") && !src.startsWith("data:")) {
-    // Rewrite relative/absolute local paths to custom protocol
-    // The main process validates against allowedRoots when serving
-    const cleanSrc = src.replace(/^\.\//, "");
-    const isAbsolute = cleanSrc.startsWith("/") || /^[a-zA-Z]:[/\\]/.test(cleanSrc);
-    const absolutePath = isAbsolute
-      ? cleanSrc.replace(/\\/g, "/")
-      : (currentFileDir + "/" + cleanSrc).replace(/\\/g, "/");
-    const urlPath = absolutePath.startsWith("/") ? absolutePath : "/" + absolutePath;
-    // Encode path segments to handle # % and other URL-significant characters
-    const encoded = urlPath.split("/").map((s) => encodeURIComponent(s)).join("/");
-    resolvedSrc = "local-img://" + encoded;
-  }
+  const resolvedSrc = resolveLocalImageSrc(src, currentFileDir);
 
   const titleAttr = title ? ` title="${title}"` : "";
   return `<img src="${resolvedSrc}" alt="${alt}"${titleAttr} />`;
@@ -212,18 +200,34 @@ const mathInlineExtension = {
 
 marked.use({ renderer, extensions: [wikiLinkExtension, mathBlockExtension, mathInlineExtension] });
 
+function rewriteHtmlImageSrcs(html: string, fileDir: string): string {
+  // Rewrite relative src attributes on <img> tags that weren't processed by
+  // the markdown renderer (i.e. raw HTML images in the source).
+  // Note: DOMPurify normalizes all attributes to double quotes, so we only
+  // need to match double-quoted src values here.
+  return html.replace(
+    /(<img\s[^>]*?\ssrc="|<img\ssrc=")([^"]+)(")/gi,
+    (_match, before, src, after) => {
+      const resolved = resolveLocalImageSrc(src, fileDir);
+      return before + resolved + after;
+    }
+  );
+}
+
 function renderMarkdown(content: string, filePath: string): string {
   // Set current directory for image resolution during this parse
   currentFileDir = filePath.replace(/[/\\][^/\\]+$/, "");
   // Reset heading slug counter for each render pass
   headingSlugCounts = {};
   const raw = marked.parse(content) as string;
-  return DOMPurify.sanitize(raw, {
+  const sanitized = DOMPurify.sanitize(raw, {
     ADD_TAGS: ["input", "annotation", "semantics", "math", "mrow", "mi", "mo", "mn", "msup", "msub", "mfrac", "mtext", "mspace", "mover", "munder"],
     ADD_ATTR: ["checked", "disabled", "type", "data-mermaid", "data-wiki-target", "aria-hidden", "style", "xmlns", "encoding"],
     ADD_URI_SAFE_ATTR: ["src"],
     ALLOWED_URI_REGEXP: /^(?:(?:https?|local-img|data|mailto):|[^a-z]|[a-z+.-]+(?:[^a-z+.\-:]|$))/i,
   });
+  // Rewrite any remaining relative <img src="..."> from raw HTML in the markdown
+  return rewriteHtmlImageSrcs(sanitized, currentFileDir);
 }
 
 const isMac = navigator.platform.includes("Mac");

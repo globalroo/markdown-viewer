@@ -17,6 +17,13 @@ const readmePath = () => path.join(testDir, "README.md");
 const guidePath = () => path.join(testDir, "docs", "guide.md");
 const notesPath = () => path.join(testDir, "docs", "notes.md");
 
+/** Create a minimal valid 1x1 red PNG (69 bytes). */
+function createTestPng(): Buffer {
+  // Minimal valid PNG: 1x1 pixel, red (#FF0000), with correct CRC and zlib compression
+  const hex = "89504e470d0a1a0a0000000d4948445200000001000000010802000000907753de0000000c49444154789c63f8cfc0000003010100c9fe92ef0000000049454e44ae426082";
+  return Buffer.from(hex, "hex");
+}
+
 test.beforeAll(() => {
   testDir = fs.mkdtempSync(path.join(os.tmpdir(), "viewmd-e2e-"));
 
@@ -27,6 +34,42 @@ test.beforeAll(() => {
   // Long file for scroll tests
   const longContent = "# Long Document\n\n" + Array.from({ length: 100 }, (_, i) => `## Section ${i + 1}\n\nParagraph ${i + 1} with enough text to take up space in the viewport.\n`).join("\n");
   fs.writeFileSync(path.join(testDir, "long.md"), longContent);
+
+  // Image test files
+  fs.mkdirSync(path.join(testDir, "images"));
+  fs.writeFileSync(path.join(testDir, "images", "test.png"), createTestPng());
+  fs.writeFileSync(path.join(testDir, "images", "my file.png"), createTestPng());
+  fs.writeFileSync(
+    path.join(testDir, "images.md"),
+    [
+      "# Image Test",
+      "",
+      "## Markdown image syntax",
+      "",
+      "![Test](./images/test.png)",
+      "",
+      "## HTML img tag",
+      "",
+      '<p><img src="images/test.png" alt="HTML test" width="32" height="32"></p>',
+      "",
+      "## External image",
+      "",
+      "![External](https://example.com/does-not-exist.png)",
+      "",
+      "## Protocol-relative image (HTML)",
+      "",
+      '<p><img src="//cdn.example.com/proto-rel.png" alt="ProtoRel"></p>',
+      "",
+      "## Protocol-relative image (markdown)",
+      "",
+      "![MdProtoRel](//cdn.example.com/md-proto-rel.png)",
+      "",
+      "## Pre-encoded URL (markdown)",
+      "",
+      "![MdEncoded](./images/my%20file.png)",
+      "",
+    ].join("\n")
+  );
 });
 
 test.afterAll(() => {
@@ -1349,4 +1392,188 @@ test("sidebar resize handle ARIA valuenow updates when width changes", async () 
   // Reset
   await handle.dblclick();
   await expect(handle).toHaveAttribute("aria-valuenow", "280");
+});
+
+// ---------------------------------------------------------------------------
+// 52. Inline images — markdown ![](path) syntax renders via local-img protocol
+// ---------------------------------------------------------------------------
+
+test("markdown image syntax renders an img with local-img:// src", async () => {
+  await openTestFolder();
+  await selectFileByName("images.md");
+
+  const previewContent = page.locator(".preview-content");
+  await expect(previewContent).toBeVisible();
+
+  // The markdown-syntax image should be rewritten to local-img://
+  const mdImg = previewContent.locator('img[alt="Test"]');
+  await expect(mdImg).toBeVisible();
+  const src = await mdImg.getAttribute("src");
+  expect(src).toMatch(/^local-img:\/\//);
+  expect(src).toContain("images");
+  expect(src).toContain("test.png");
+});
+
+// ---------------------------------------------------------------------------
+// 53. Inline images — HTML <img> tags are rewritten to local-img protocol
+// ---------------------------------------------------------------------------
+
+test("HTML img tags in markdown are rewritten to local-img:// src", async () => {
+  await openTestFolder();
+  await selectFileByName("images.md");
+
+  const previewContent = page.locator(".preview-content");
+  await expect(previewContent).toBeVisible();
+
+  // The HTML <img> tag should also be rewritten to local-img://
+  const htmlImg = previewContent.locator('img[alt="HTML test"]');
+  await expect(htmlImg).toBeVisible();
+  const src = await htmlImg.getAttribute("src");
+  expect(src).toMatch(/^local-img:\/\//);
+  expect(src).toContain("images");
+  expect(src).toContain("test.png");
+});
+
+// ---------------------------------------------------------------------------
+// 54. Inline images — local-img protocol actually serves the image (non-zero natural size)
+// ---------------------------------------------------------------------------
+
+test("local-img protocol serves images with non-zero dimensions", async () => {
+  await openTestFolder();
+  await selectFileByName("images.md");
+
+  const previewContent = page.locator(".preview-content");
+  await expect(previewContent).toBeVisible();
+
+  // Wait for the markdown image to load
+  const mdImg = previewContent.locator('img[alt="Test"]');
+  await expect(mdImg).toBeVisible();
+
+  // Wait for the image to actually load (naturalWidth > 0)
+  await mdImg.evaluate((img: HTMLImageElement) =>
+    img.complete
+      ? Promise.resolve()
+      : new Promise<void>((resolve) => {
+          img.onload = () => resolve();
+          img.onerror = () => resolve();
+        })
+  );
+
+  const naturalWidth = await mdImg.evaluate((img: HTMLImageElement) => img.naturalWidth);
+  expect(naturalWidth).toBeGreaterThan(0);
+});
+
+// ---------------------------------------------------------------------------
+// 55. Inline images — external https:// images are not rewritten
+// ---------------------------------------------------------------------------
+
+test("external https:// images are not rewritten to local-img", async () => {
+  await openTestFolder();
+  await selectFileByName("images.md");
+
+  const previewContent = page.locator(".preview-content");
+  await expect(previewContent).toBeVisible();
+
+  const externalImg = previewContent.locator('img[alt="External"]');
+  await expect(externalImg).toBeVisible();
+  const src = await externalImg.getAttribute("src");
+  expect(src).toMatch(/^https:\/\//);
+});
+
+// ---------------------------------------------------------------------------
+// 56. Startup performance — app loads within budget
+// ---------------------------------------------------------------------------
+
+test("app startup completes within 5 seconds", async () => {
+  // Close the default app from beforeEach
+  const pid = app.process().pid;
+  if (pid) process.kill(pid, "SIGKILL");
+
+  // Measure a fresh launch with a directory argument
+  const startMs = Date.now();
+  app = await electron.launch({ args: ["dist/main/main.js", testDir] });
+  page = await app.firstWindow();
+  await page.waitForLoadState("domcontentloaded");
+
+  // Wait for the file tree to appear (indicates initial path was processed)
+  await page.waitForSelector(".file-tree", { timeout: 5000 });
+  const elapsedMs = Date.now() - startMs;
+
+  // Budget: 5 seconds covers cold Electron launch + renderer + initial scan
+  expect(elapsedMs).toBeLessThan(5000);
+});
+
+// ---------------------------------------------------------------------------
+// 57. Startup performance — DOM ready within 3 seconds
+// ---------------------------------------------------------------------------
+
+test("DOM is ready within 3 seconds of launch", async () => {
+  // Close the default app from beforeEach
+  const pid = app.process().pid;
+  if (pid) process.kill(pid, "SIGKILL");
+
+  const startMs = Date.now();
+  app = await electron.launch({ args: ["dist/main/main.js"] });
+  page = await app.firstWindow();
+  await page.waitForLoadState("domcontentloaded");
+  const elapsedMs = Date.now() - startMs;
+
+  // Budget: 3 seconds for DOM ready (no directory scan involved)
+  expect(elapsedMs).toBeLessThan(3000);
+});
+
+// ---------------------------------------------------------------------------
+// 58. Inline images — protocol-relative URLs are not rewritten
+// ---------------------------------------------------------------------------
+
+test("protocol-relative image URLs are not rewritten to local-img", async () => {
+  await openTestFolder();
+  await selectFileByName("images.md");
+
+  const previewContent = page.locator(".preview-content");
+  await expect(previewContent).toBeVisible();
+
+  const protoRelImg = previewContent.locator('img[alt="ProtoRel"]');
+  await expect(protoRelImg).toBeVisible();
+  const src = await protoRelImg.getAttribute("src");
+  expect(src).toMatch(/^\/\//);
+  expect(src).not.toContain("local-img");
+});
+
+// ---------------------------------------------------------------------------
+// 59. Markdown ![](//host/path) protocol-relative URLs are not rewritten
+// ---------------------------------------------------------------------------
+
+test("markdown-syntax protocol-relative image URLs are not rewritten", async () => {
+  await openTestFolder();
+  await selectFileByName("images.md");
+
+  const previewContent = page.locator(".preview-content");
+  await expect(previewContent).toBeVisible();
+
+  const mdProtoRelImg = previewContent.locator('img[alt="MdProtoRel"]');
+  await expect(mdProtoRelImg).toBeVisible();
+  const src = await mdProtoRelImg.getAttribute("src");
+  expect(src).toMatch(/^\/\//);
+  expect(src).not.toContain("local-img");
+});
+
+// ---------------------------------------------------------------------------
+// 60. Pre-encoded markdown image URL is not double-encoded
+// ---------------------------------------------------------------------------
+
+test("markdown-syntax pre-encoded image URL is not double-encoded", async () => {
+  await openTestFolder();
+  await selectFileByName("images.md");
+
+  const previewContent = page.locator(".preview-content");
+  await expect(previewContent).toBeVisible();
+
+  const encodedImg = previewContent.locator('img[alt="MdEncoded"]');
+  await expect(encodedImg).toBeVisible();
+  const src = await encodedImg.getAttribute("src");
+  expect(src).toContain("local-img://");
+  // %20 should appear (space encoded), but %2520 (double-encoded) must not
+  expect(src).toContain("my%20file.png");
+  expect(src).not.toContain("%2520");
 });
