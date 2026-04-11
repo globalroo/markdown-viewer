@@ -1,5 +1,29 @@
 # Changelog
 
+## [1.6.1] - 2026-04-11
+
+### Fixed
+
+- **HTML image rendering** — raw HTML `<img>` tags in markdown (e.g. `<img src="build/icon.png">`) were not rewritten to the `local-img://` protocol, so images failed to load. Both the markdown renderer and the HTML rewriter now use a shared `resolveLocalImageSrc()` utility.
+- **Double-encoding prevention** — pre-encoded URLs (e.g. `my%20file.png`) are decoded before re-encoding, preventing `%20` from becoming `%2520`.
+- **Protocol-relative URLs** — `//cdn.example.com/image.png` in both markdown `![]()` and HTML `<img>` syntax is now left unchanged instead of being incorrectly rewritten to `local-img://`.
+- **CLI wrapper** — the macOS CLI wrapper now resolves relative paths to absolute before launching the binary directly, fixing `viewmd .` path resolution. Removed `exec` before backgrounded process.
+
+### Added
+
+- **Cross-platform install script** (`scripts/install.sh`) — automates app installation and CLI setup for macOS, Linux (deb + AppImage), and Windows (guidance). Supports `--build` flag. Checks `/Applications` writability for sudo, verifies `dpkg` availability on Linux.
+- **Image rendering E2E tests** — 8 new Playwright tests verifying markdown image syntax, HTML `<img>` tag rewriting, protocol serving (naturalWidth > 0), protocol-relative URL passthrough, and double-encoding prevention for both syntaxes.
+- **Startup performance tests** — 2 new E2E tests enforcing startup budgets (5s with directory arg, 3s for DOM ready).
+- **Image rewrite unit tests** — 17 tests for `resolveLocalImageSrc()` and the HTML regex matcher, importing the real production function.
+
+## [1.6.0] - 2026-04-10
+
+### Added
+
+- **PDF export** — export rendered markdown as PDF via `printToPDF`.
+- **DOCX export** — export rendered markdown as Word document via `html-docx-js`.
+- **HTML export** — export rendered markdown as standalone HTML with embedded styles.
+
 ## [1.5.1] - 2026-04-08
 
 ### Added
