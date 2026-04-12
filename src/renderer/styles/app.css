@@ -2162,16 +2162,26 @@ body {
   min-height: 0;
 }
 
-/* Content prose: clear indent from heading with border for containment.
+/* Content prose: visible indent from heading with border for containment.
    Left padding gives paragraphs breathing room from the border line.
    Lists/blockquotes add their own internal indent on top of this. */
+/* Content prose: border+text aligns with its own heading's indent level.
+   Base margin-left matches L1 heading indent. Per-level overrides match
+   each heading's padding-left so content sits under its own heading. */
 .collapsible-section-content {
-  padding: 0.25em 1em 0.4em 1em;
-  margin-bottom: 0.2em;
-  border-left: 1px solid var(--border-color);
-  margin-left: 0.3em;
+  padding: 0.3em 1em 0.2em 0.8em;
+  margin-top: 0.1em;
+  margin-bottom: 0.1em;
+  border-left: 2px solid var(--border-color);
+  margin-left: 1.5em;
   font-size: 0.88em;
 }
+
+.collapsible-section-L2 > .collapsible-section-body .collapsible-section-content { margin-left: 2.4em; }
+.collapsible-section-L3 > .collapsible-section-body .collapsible-section-content { margin-left: 3.25em; }
+.collapsible-section-L4 > .collapsible-section-body .collapsible-section-content { margin-left: 4.1em; }
+.collapsible-section-L5 > .collapsible-section-body .collapsible-section-content { margin-left: 5em; }
+.collapsible-section-L6 > .collapsible-section-body .collapsible-section-content { margin-left: 5.9em; }
 
 /* Reduce list indent inside collapsible content to prevent double-indent */
 .collapsible-section-content ul,
