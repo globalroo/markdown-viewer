@@ -326,7 +326,7 @@ export function DocumentOutline() {
               <button
                 key={`${h.id}-${i}`}
                 className={`outline-item ${activeId === h.id ? "active" : ""}`}
-                style={{ paddingLeft: `${8 + (h.level - minLevel) * 12}px` }}
+                style={{ paddingLeft: `${0.6 + (h.level - minLevel) * 0.9}em` }}
                 onClick={() => handleClick(h.id)}
                 title={h.text}
               >

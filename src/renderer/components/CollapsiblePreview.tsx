@@ -42,12 +42,12 @@ function ChevronIcon({ expanded }: { expanded: boolean }) {
     <svg
       className={`collapsible-chevron${expanded ? " expanded" : ""}`}
       aria-hidden="true"
-      width="12"
-      height="12"
+      width="10"
+      height="10"
       viewBox="0 0 12 12"
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.5"
+      strokeWidth="1.2"
       strokeLinecap="round"
       strokeLinejoin="round"
     >
@@ -138,23 +138,23 @@ function CollapsibleSection({
               onClick={onClick}
             />
           )}
-          {section.children.map((child) => (
-            <CollapsibleSection
-              key={child.heading.id}
-              section={child}
-              fileDir={fileDir}
-              links={links}
-              depth={depth + 1}
-              expandedSet={expandedSet}
-              onToggle={onToggle}
-              focusedId={focusedId}
-              isFirstVisible={false}
-              onFocus={onFocus}
-              onClick={onClick}
-            />
-          ))}
         </div>
       </div>
+      {section.children.map((child) => (
+        <CollapsibleSection
+          key={child.heading.id}
+          section={child}
+          fileDir={fileDir}
+          links={links}
+          depth={depth + 1}
+          expandedSet={expandedSet}
+          onToggle={onToggle}
+          focusedId={focusedId}
+          isFirstVisible={false}
+          onFocus={onFocus}
+          onClick={onClick}
+        />
+      ))}
     </div>
   );
 }
@@ -307,32 +307,18 @@ export function CollapsiblePreview({ sectionModel, selectedFile, onClick }: Coll
     requestAnimationFrame(() => setNoTransition(false));
   }, [selectedFile, scheduleSave]);
 
-  // Compute visible headings (skip children of collapsed parents)
-  const visibleHeadings = useMemo(() => {
-    const visible: typeof sectionModel.flatHeadings = [];
-    function collectVisible(sections: Section[]) {
-      for (const section of sections) {
-        visible.push(section.heading);
-        if (expandedSet.has(section.heading.id)) {
-          collectVisible(section.children);
-        }
-      }
-    }
-    collectVisible(sectionModel.sections);
-    return visible;
-  }, [sectionModel.sections, expandedSet]);
-
-  const visibleHeadingIds = useMemo(
-    () => new Set(visibleHeadings.map((h) => h.id)),
-    [visibleHeadings]
+  // All headings are always visible (children outside collapsible body).
+  // Just validate focusedId still exists after heading changes (editing).
+  const allHeadingIds = useMemo(
+    () => new Set(sectionModel.flatHeadings.map((h) => h.id)),
+    [sectionModel.flatHeadings]
   );
 
-  // Clear focusedId if it becomes invisible (parent collapsed)
   useEffect(() => {
-    if (focusedId && !visibleHeadingIds.has(focusedId)) {
+    if (focusedId && !allHeadingIds.has(focusedId)) {
       setFocusedId(null);
     }
-  }, [focusedId, visibleHeadingIds]);
+  }, [focusedId, allHeadingIds]);
 
   // Keyboard navigation
   useEffect(() => {
@@ -344,7 +330,7 @@ export function CollapsiblePreview({ sectionModel, selectedFile, onClick }: Coll
       // Don't handle keys when in input/textarea
       if (target.tagName === "INPUT" || target.tagName === "TEXTAREA") return;
 
-      const headings = visibleHeadings;
+      const headings = sectionModel.flatHeadings;
       if (headings.length === 0) return;
 
       const currentIdx = focusedId
@@ -396,7 +382,7 @@ export function CollapsiblePreview({ sectionModel, selectedFile, onClick }: Coll
 
     container.addEventListener("keydown", handleKeyDown);
     return () => container.removeEventListener("keydown", handleKeyDown);
-  }, [visibleHeadings, focusedId, expandedSet, toggle, expandAll, collapseAll]);
+  }, [sectionModel.flatHeadings, focusedId, expandedSet, toggle, expandAll, collapseAll]);
 
   // Cmd+F: expand all sections so native browser find can search content
   useEffect(() => {
