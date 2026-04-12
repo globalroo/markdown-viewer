@@ -2016,16 +2016,29 @@ body {
   color: var(--text-primary);
 }
 
+.collapsible-shortcut-hint {
+  font-size: 0.65em;
+  color: var(--text-muted);
+  opacity: 0.6;
+  margin-left: auto;
+}
+
 .collapsible-count {
   font-size: 0.7em;
   color: var(--text-muted);
-  margin-left: auto;
 }
 
 .collapsible-preamble {
   padding: 0 24px 8px;
   border-bottom: 1px solid var(--border-color);
   margin-bottom: 4px;
+}
+
+.collapsible-frontmatter {
+  opacity: 0.5;
+  font-family: "SF Mono", "Cascadia Code", "JetBrains Mono", "Fira Code",
+    Menlo, Consolas, monospace;
+  font-size: 0.85em;
 }
 
 .collapsible-section {
@@ -2055,13 +2068,22 @@ body {
   border-radius: 2px;
 }
 
-/* Indent nested headings + left-border spine for depth cues */
-.collapsible-heading-row-L1 { border-left: 3px solid var(--accent); padding-bottom: 6px; border-bottom: 1px solid var(--border-color); margin-bottom: 2px; }
-.collapsible-heading-row-L2 { padding-left: 38px; border-left: 3px solid color-mix(in srgb, var(--accent) 70%, transparent); }
-.collapsible-heading-row-L3 { padding-left: 52px; border-left: 2px solid color-mix(in srgb, var(--accent) 50%, transparent); }
-.collapsible-heading-row-L4 { padding-left: 66px; border-left: 2px solid color-mix(in srgb, var(--accent) 30%, transparent); }
+/* Indent nested headings + left-border spine for depth cues.
+   Fallback borders use var(--accent, var(--border-color)) for browsers
+   or cases where --accent is undefined. color-mix() progressives follow. */
+.collapsible-heading-row-L1 { border-left: 3px solid var(--accent, var(--border-color)); padding-bottom: 6px; border-bottom: 1px solid var(--border-color); margin-bottom: 2px; }
+.collapsible-heading-row-L2 { padding-left: 38px; border-left: 3px solid var(--accent, var(--border-color)); }
+.collapsible-heading-row-L3 { padding-left: 52px; border-left: 2px solid var(--accent, var(--border-color)); }
+.collapsible-heading-row-L4 { padding-left: 66px; border-left: 2px solid var(--border-color); }
 .collapsible-heading-row-L5 { padding-left: 80px; border-left: 1px solid var(--border-color); }
 .collapsible-heading-row-L6 { padding-left: 94px; border-left: 1px solid var(--border-color); }
+
+/* Progressive enhancement: use color-mix() where supported for fading spine */
+@supports (border-color: color-mix(in srgb, red 50%, transparent)) {
+  .collapsible-heading-row-L2 { border-left-color: color-mix(in srgb, var(--accent, var(--border-color)) 70%, transparent); }
+  .collapsible-heading-row-L3 { border-left-color: color-mix(in srgb, var(--accent, var(--border-color)) 50%, transparent); }
+  .collapsible-heading-row-L4 { border-left-color: color-mix(in srgb, var(--accent, var(--border-color)) 30%, transparent); }
+}
 
 /* Chevron as subtle outdent */
 .collapsible-chevron {
@@ -2140,6 +2162,12 @@ body {
 /* Skip animation for batch expand/collapse */
 .no-transition .collapsible-section-body {
   transition: none;
+}
+
+/* Hide reading progress bar when collapsible mode is active — fold state
+   changes document height, making the bar erratic and misleading. */
+.preview-container:has(.collapsible-preview) > .progress-bar-track {
+  display: none;
 }
 
 /* ========================================

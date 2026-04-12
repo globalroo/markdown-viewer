@@ -116,4 +116,31 @@ describe("extractLinksFromContent", () => {
     expect(results[0].context.line).toBe(3);
     expect(results[0].context.text).toContain("guide");
   });
+
+  // Edge cases (Issue 18)
+
+  it("setext-style headings do not create false links", () => {
+    const content = "My Heading\n==========\n\nSome text.\n\nAnother Heading\n---------------\n";
+    const results = extractLinksFromContent(content, "/project/readme.md", filenameLookup);
+    expect(results.length).toBe(0);
+  });
+
+  it("handles links with special characters in path", () => {
+    const content = "See [notes](./my%20notes.md) and [report](./2024-Q1%20(final).md).";
+    const results = extractLinksFromContent(content, "/project/readme.md", filenameLookup);
+    expect(results.length).toBe(2);
+  });
+
+  it("does not extract links with unencoded spaces in path (invalid markdown)", () => {
+    // Markdown parsers don't treat bare spaces in URLs as valid link targets
+    const content = 'See [doc](./my doc.md).';
+    const results = extractLinksFromContent(content, "/project/readme.md", filenameLookup);
+    expect(results.length).toBe(0);
+  });
+
+  it("handles links with parentheses in path", () => {
+    const content = "See [report](./report%20(draft).md).";
+    const results = extractLinksFromContent(content, "/project/readme.md", filenameLookup);
+    expect(results.length).toBe(1);
+  });
 });

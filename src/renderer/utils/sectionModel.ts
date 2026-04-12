@@ -17,6 +17,8 @@ export interface Section {
 export interface SectionModel {
   sourceFile: string;
   preamble: Token[];
+  /** True when the preamble looks like YAML frontmatter (---\n...\n---) */
+  preambleIsFrontmatter: boolean;
   sections: Section[];
   flatHeadings: SectionHeading[];
   annotatedTokens: TokensList;
@@ -145,9 +147,25 @@ export function buildSectionModel(content: string, sourceFile: string): SectionM
 
   const { sections } = nestSections(flatSections, 0, 0);
 
+  // Detect YAML frontmatter pattern: hr, paragraph-like content, hr as first 3+ tokens
+  // marked.lexer renders `---` as `hr` tokens, and the YAML body as paragraph/code tokens.
+  let preambleIsFrontmatter = false;
+  if (
+    preamble.length >= 3 &&
+    preamble[0].type === "hr" &&
+    preamble[preamble.length - 1].type === "hr"
+  ) {
+    // Everything between the two hr tokens should be non-heading content
+    const inner = preamble.slice(1, -1);
+    preambleIsFrontmatter = inner.length > 0 && inner.every(
+      (t) => t.type !== "heading" && t.type !== "hr"
+    );
+  }
+
   return {
     sourceFile,
     preamble,
+    preambleIsFrontmatter,
     sections,
     flatHeadings,
     annotatedTokens: tokens,

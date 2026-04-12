@@ -158,6 +158,26 @@ test.beforeAll(() => {
     path.join(testDir, "isolated.md"),
     "# Isolated\n\nThis file has no links.\n"
   );
+
+  // Document with mermaid code block for rendering test
+  fs.writeFileSync(
+    path.join(testDir, "mermaid-doc.md"),
+    [
+      "# Diagrams",
+      "",
+      "## Flow Chart",
+      "",
+      "```mermaid",
+      "graph TD",
+      "    A[Start] --> B[End]",
+      "```",
+      "",
+      "## Notes",
+      "",
+      "Some notes here.",
+      "",
+    ].join("\n")
+  );
 });
 
 test.afterAll(() => {
@@ -1189,5 +1209,132 @@ test.describe("Edge Cases", () => {
     // Should be in a valid state (not crashed)
     const headings = page.locator(".collapsible-heading-text");
     expect(await headings.count()).toBe(11);
+  });
+});
+
+// ===========================================================================
+// 14. EXPORT PIPELINE INTEGRITY (Issue 16)
+// ===========================================================================
+
+test.describe("Export Pipeline Integrity", () => {
+  test("standard mode preview-content has heading IDs", async () => {
+    await openTestFolder();
+    await selectFileByName("test-collapse.md");
+    await page.waitForTimeout(300);
+
+    // In standard mode, the visible preview-content should have heading IDs
+    const headingIds = await page.evaluate(() => {
+      const content = document.querySelector('.preview-content:not([style*="display: none"])');
+      if (!content) return [];
+      const headings = content.querySelectorAll("h1[id], h2[id], h3[id], h4[id], h5[id], h6[id]");
+      return Array.from(headings).map((h) => h.id);
+    });
+    expect(headingIds.length).toBeGreaterThan(0);
+    // IDs should be non-empty strings
+    for (const id of headingIds) {
+      expect(id.length).toBeGreaterThan(0);
+    }
+  });
+
+  test("collapsible mode strips heading IDs from hidden standard content", async () => {
+    await openTestFolder();
+    await selectFileByName("test-collapse.md");
+    await enableCollapsibleMode();
+    await page.waitForTimeout(300);
+
+    // The hidden standard preview-content should NOT have heading IDs
+    // (they are stripped to avoid duplicate IDs in the DOM)
+    const hiddenIds = await page.evaluate(() => {
+      const hidden = document.querySelector('.preview-content[style*="display: none"], .preview-content-hidden');
+      if (!hidden) return [];
+      const headings = hidden.querySelectorAll("h1[id], h2[id], h3[id], h4[id], h5[id], h6[id]");
+      return Array.from(headings).map((h) => h.id);
+    });
+    expect(hiddenIds.length).toBe(0);
+  });
+});
+
+// ===========================================================================
+// 15. EDIT MODE + COLLAPSIBLE INTERACTION (Issue 17)
+// ===========================================================================
+
+test.describe("Edit Mode and Collapsible Interaction", () => {
+  test("edit mode hides collapsible toggle, exit re-enables it", async () => {
+    await openTestFolder();
+    await selectFileByName("test-collapse.md");
+
+    const collapseBtn = page.locator('.toolbar-btn[aria-label*="Collapsible"]');
+    await expect(collapseBtn).toBeVisible();
+
+    // Enter edit mode
+    await page.keyboard.press(`${modKey()}+e`);
+    await page.waitForTimeout(300);
+    await expect(collapseBtn).not.toBeVisible();
+
+    // Exit edit mode
+    await page.keyboard.press(`${modKey()}+e`);
+    await page.waitForTimeout(300);
+    await expect(collapseBtn).toBeVisible();
+
+    // Now enable collapsible and verify it works
+    await enableCollapsibleMode();
+    const headings = page.locator(".collapsible-heading-text");
+    expect(await headings.count()).toBe(11);
+  });
+
+  test("entering edit mode while in collapsible mode is graceful", async () => {
+    await openTestFolder();
+    await selectFileByName("test-collapse.md");
+    await enableCollapsibleMode();
+
+    // Expand a section
+    await page.locator(".collapsible-heading-row").first().click();
+    await page.waitForTimeout(300);
+
+    // Enter edit mode
+    await page.keyboard.press(`${modKey()}+e`);
+    await page.waitForTimeout(300);
+
+    // Editor textarea should be visible
+    await expect(page.locator(".edit-textarea")).toBeVisible();
+
+    // Collapsible button should be hidden
+    const collapseBtn = page.locator('.toolbar-btn[aria-label*="Collapsible"]');
+    await expect(collapseBtn).not.toBeVisible();
+
+    // Exit edit mode
+    await page.keyboard.press(`${modKey()}+e`);
+    await page.waitForTimeout(300);
+
+    // Collapsible view should still be active
+    await expect(page.locator(".collapsible-preview")).toBeVisible();
+  });
+});
+
+// ===========================================================================
+// 16. MERMAID IN COLLAPSIBLE SECTIONS (Issue 20)
+// ===========================================================================
+
+test.describe("Mermaid in Collapsible Sections", () => {
+  test("expanding section with mermaid renders SVG", async () => {
+    await openTestFolder();
+    await selectFileByName("mermaid-doc.md");
+    await enableCollapsibleMode();
+    await page.waitForTimeout(300);
+
+    // Expand the "Flow Chart" section that contains the mermaid block
+    const row = page.locator('.collapsible-heading-row:has(.collapsible-heading-text:text-is("Flow Chart"))');
+    await row.click();
+    await page.waitForTimeout(2000); // Mermaid rendering can be slow
+
+    // Check that a mermaid-block exists with rendered SVG
+    const hasSvg = await page.evaluate(() => {
+      const blocks = document.querySelectorAll(".mermaid-block");
+      for (const block of blocks) {
+        if (block.querySelector("svg")) return true;
+      }
+      return false;
+    });
+    expect(hasSvg).toBe(true);
   });
 });

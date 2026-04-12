@@ -272,6 +272,10 @@ function ContentSearchResults({
 }) {
   const { selectFile } = useAppStore();
 
+  // TODO(Issue 9): When clicking a content search result in collapsible mode,
+  // the matched content may be inside a collapsed section. This requires
+  // cross-component communication to expand the relevant section. For now,
+  // users can use Cmd+F which already expands all sections for native find.
   const handleClick = useCallback(
     (result: SearchResult) => {
       selectFile(result.filePath);

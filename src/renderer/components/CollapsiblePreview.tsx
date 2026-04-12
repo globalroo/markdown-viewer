@@ -2,6 +2,7 @@ import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { marked, type Token, type TokensList } from "marked";
 import DOMPurify from "dompurify";
 import { resolveLocalImageSrc } from "../utils/resolveLocalImageSrc";
+import { SANITIZE_CONFIG } from "../utils/sanitizeConfig";
 import { diffHeadingIds, type SectionModel, type Section, type SectionHeading } from "../utils/sectionModel";
 
 interface CollapsiblePreviewProps {
@@ -21,12 +22,7 @@ function rewriteHtmlImageSrcs(html: string, fileDir: string): string {
 }
 
 function sanitizeHtml(raw: string, fileDir: string): string {
-  const sanitized = DOMPurify.sanitize(raw, {
-    ADD_TAGS: ["input", "annotation", "semantics", "math", "mrow", "mi", "mo", "mn", "msup", "msub", "mfrac", "mtext", "mspace", "mover", "munder"],
-    ADD_ATTR: ["checked", "disabled", "type", "data-mermaid", "data-wiki-target", "aria-hidden", "style", "xmlns", "encoding"],
-    ADD_URI_SAFE_ATTR: ["src"],
-    ALLOWED_URI_REGEXP: /^(?:(?:https?|local-img|data|mailto):|[^a-z]|[a-z+.-]+(?:[^a-z+.\-:]|$))/i,
-  });
+  const sanitized = DOMPurify.sanitize(raw, SANITIZE_CONFIG);
   return rewriteHtmlImageSrcs(sanitized, fileDir);
 }
 
@@ -113,6 +109,7 @@ function CollapsibleSection({
         onClick={() => onToggle(section.heading.id)}
         onFocus={() => onFocus(section.heading.id)}
         aria-expanded={isExpanded}
+        aria-controls={`body-${section.heading.id}`}
         data-heading-id={section.heading.id}
         tabIndex={isTabbable ? 0 : -1}
       >
@@ -129,7 +126,10 @@ function CollapsibleSection({
           <span className="collapsible-line-count">{section.rawLineCount} lines</span>
         )}
       </button>
-      <div className={`collapsible-section-body${isExpanded ? " expanded" : ""}`}>
+      <div
+        id={`body-${section.heading.id}`}
+        className={`collapsible-section-body${isExpanded ? " expanded" : ""}`}
+      >
         <div className="collapsible-section-inner">
           {hasExpanded && contentHtml && (
             <div
@@ -424,6 +424,7 @@ export function CollapsiblePreview({ sectionModel, selectedFile, onClick }: Coll
       className={`collapsible-preview${noTransition ? " no-transition" : ""}`}
       ref={containerRef}
       tabIndex={-1}
+      aria-label="Collapsible document view"
     >
       <div className="collapsible-controls">
         <button className="collapsible-control-btn" onClick={expandAll}>
@@ -432,6 +433,7 @@ export function CollapsiblePreview({ sectionModel, selectedFile, onClick }: Coll
         <button className="collapsible-control-btn" onClick={collapseAll}>
           Collapse All
         </button>
+        <span className="collapsible-shortcut-hint" aria-hidden="true">j/k navigate &middot; Enter expand &middot; [ ] all</span>
         <span className="collapsible-count">
           {searchExpanded && (
             <span className="collapsible-search-indicator">Expanded for search (Esc to restore) </span>
@@ -441,7 +443,7 @@ export function CollapsiblePreview({ sectionModel, selectedFile, onClick }: Coll
       </div>
       {preambleHtml && (
         <div
-          className="preview-content collapsible-preamble"
+          className={`preview-content collapsible-preamble${sectionModel.preambleIsFrontmatter ? " collapsible-frontmatter" : ""}`}
           dangerouslySetInnerHTML={{ __html: preambleHtml }}
           onClick={onClick}
         />

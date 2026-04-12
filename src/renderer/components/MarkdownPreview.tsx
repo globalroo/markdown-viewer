@@ -8,6 +8,7 @@ import "katex/dist/katex.min.css";
 import { useAppStore } from "../store";
 import { analyzeText, computeReadability, type StyleIssue } from "../utils/styleCheck";
 import { resolveLocalImageSrc } from "../utils/resolveLocalImageSrc";
+import { SANITIZE_CONFIG } from "../utils/sanitizeConfig";
 import { buildSectionModel, type SectionModel } from "../utils/sectionModel";
 import { CollapsiblePreview } from "./CollapsiblePreview";
 import { WIKI_LINK_PATTERN } from "../../shared/linkPatterns";
@@ -230,12 +231,7 @@ function renderMarkdownFromModel(model: SectionModel, filePath: string): string 
   headingSlugCounts = {};
   // Use annotated tokens (with _canonicalId stamped on headings) for rendering
   const raw = marked.parser(model.annotatedTokens);
-  const sanitized = DOMPurify.sanitize(raw, {
-    ADD_TAGS: ["input", "annotation", "semantics", "math", "mrow", "mi", "mo", "mn", "msup", "msub", "mfrac", "mtext", "mspace", "mover", "munder"],
-    ADD_ATTR: ["checked", "disabled", "type", "data-mermaid", "data-wiki-target", "aria-hidden", "style", "xmlns", "encoding"],
-    ADD_URI_SAFE_ATTR: ["src"],
-    ALLOWED_URI_REGEXP: /^(?:(?:https?|local-img|data|mailto):|[^a-z]|[a-z+.-]+(?:[^a-z+.\-:]|$))/i,
-  });
+  const sanitized = DOMPurify.sanitize(raw, SANITIZE_CONFIG);
   return rewriteHtmlImageSrcs(sanitized, currentFileDir);
 }
 
@@ -280,7 +276,12 @@ export function MarkdownPreview() {
   const [copyFeedback, setCopyFeedback] = useState(false);
   const [scrollProgress, setScrollProgress] = useState(0);
 
-  // Save scroll position of the previous tab before switching
+  // Save scroll position of the previous tab before switching.
+  // TODO(Issue 8): In collapsible mode, saved scroll positions are unreliable
+  // because fold state changes document height. Scroll restoration still works
+  // reasonably because fold state is persisted separately and restored before
+  // the scroll position is applied. A more robust approach would save the
+  // nearest visible heading ID and scroll to it after fold state is restored.
   const prevFileRef = useRef<string | null>(null);
 
   // Load file content on selection change, with dirty guard
@@ -542,7 +543,77 @@ export function MarkdownPreview() {
       }
     }
     } // end containers loop
-    return removeMarks;
+
+    // Watch for new .preview-content nodes added by collapsible section expansion
+    // so style highlights are applied to lazily-rendered content.
+    const observer = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        for (const node of mutation.addedNodes) {
+          if (!(node instanceof Element)) continue;
+          const targets = node.matches(".preview-content")
+            ? [node as HTMLElement]
+            : Array.from(node.querySelectorAll<HTMLElement>(".preview-content"));
+          for (const container of targets) {
+            const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, {
+              acceptNode: (n) => {
+                const parent = n.parentElement;
+                if (!parent) return NodeFilter.FILTER_REJECT;
+                const tag = parent.tagName;
+                if (tag === "CODE" || tag === "PRE" || tag === "SCRIPT" || tag === "STYLE" || tag === "MARK") {
+                  return NodeFilter.FILTER_REJECT;
+                }
+                return NodeFilter.FILTER_ACCEPT;
+              },
+            });
+            const textNodes: Text[] = [];
+            let tn: Node | null;
+            while ((tn = walker.nextNode())) textNodes.push(tn as Text);
+
+            for (const textNode of textNodes) {
+              const text = textNode.textContent || "";
+              combinedPattern.lastIndex = 0;
+              const fragments: (string | HTMLElement)[] = [];
+              let last = 0;
+              let mr: RegExpExecArray | null;
+              while ((mr = combinedPattern.exec(text)) !== null) {
+                const matched = mr[0];
+                const info = issueLookup.get(matched.toLowerCase());
+                if (!info) continue;
+                if (mr.index > last) fragments.push(text.slice(last, mr.index));
+                const mark = document.createElement("mark");
+                mark.className = `style-issue style-${info.type}`;
+                mark.textContent = matched;
+                if (info.suggestion) {
+                  mark.setAttribute("data-tooltip", info.suggestion);
+                  mark.title = info.suggestion;
+                }
+                fragments.push(mark);
+                last = mr.index + matched.length;
+              }
+              if (fragments.length > 0) {
+                if (last < text.length) fragments.push(text.slice(last));
+                const parent = textNode.parentNode;
+                if (parent) {
+                  const frag = document.createDocumentFragment();
+                  for (const f of fragments) {
+                    frag.appendChild(typeof f === "string" ? document.createTextNode(f) : f);
+                  }
+                  parent.replaceChild(frag, textNode);
+                }
+              }
+            }
+          }
+        }
+      }
+    });
+    if (scrollContainer) {
+      observer.observe(scrollContainer, { childList: true, subtree: true });
+    }
+
+    return () => {
+      removeMarks();
+      observer.disconnect();
+    };
   }, [html, styleCheckEnabled, editMode, styleIssues]);
 
   // Render Mermaid diagrams after DOM update.
