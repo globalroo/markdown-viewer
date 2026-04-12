@@ -367,7 +367,22 @@ export function Sidebar() {
     }
     let cancelled = false;
     window.api.getConnectedPaths(selectedFile, linksFilterHops).then((paths) => {
-      if (!cancelled) setConnectedPaths(new Set(paths));
+      if (cancelled) return;
+      const pathSet = new Set(paths);
+      setConnectedPaths(pathSet);
+      // Auto-expand ancestor directories so filtered files are visible
+      const store = useAppStore.getState();
+      const dirsToExpand: string[] = [];
+      for (const p of paths) {
+        let dir = p.substring(0, p.lastIndexOf("/"));
+        while (dir && !store.expandedDirs.has(dir)) {
+          dirsToExpand.push(dir);
+          dir = dir.substring(0, dir.lastIndexOf("/"));
+        }
+      }
+      if (dirsToExpand.length > 0) {
+        for (const d of dirsToExpand) store.toggleDir(d);
+      }
     });
     return () => { cancelled = true; };
   }, [linksFilterActive, selectedFile, linksFilterHops, linkGraph]);

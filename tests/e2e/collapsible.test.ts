@@ -768,14 +768,20 @@ test.describe("Right Panel Segmented Control", () => {
     await lastItem.click();
     await page.waitForTimeout(500);
 
-    // Scroll should have changed
+    // Scroll position should have changed (or stayed if doc fits viewport)
     const scrollAfter = await page.evaluate(() => {
       const el = document.querySelector(".preview-scroll");
       return el ? el.scrollTop : 0;
     });
 
-    // For a document long enough to scroll, position should change
-    // (may not change if document fits in viewport)
+    // If doc is long enough to scroll, assert the position changed
+    const scrollHeight = await page.evaluate(() => {
+      const el = document.querySelector(".preview-scroll");
+      return el ? el.scrollHeight - el.clientHeight : 0;
+    });
+    if (scrollHeight > 0) {
+      expect(scrollAfter).not.toBe(scrollBefore);
+    }
   });
 
   test("panel shows for heading-free docs with links in Links view", async () => {
@@ -910,6 +916,9 @@ test.describe("Links Panel", () => {
     const linkItems = page.locator(".link-item:not([disabled])");
     const count = await linkItems.count();
     if (count > 0) {
+      // Get target filename from the link item
+      const targetName = await linkItems.first().locator(".link-item-filename").textContent();
+
       // Click first link
       await linkItems.first().click();
       await page.waitForTimeout(500);
@@ -917,6 +926,13 @@ test.describe("Links Panel", () => {
       // Preview should show new file content
       const preview = page.locator(".preview-content, .collapsible-preview");
       await expect(preview.first()).toBeVisible();
+
+      // The preview filename should match the target
+      const previewFilename = page.locator(".preview-filename");
+      if (await previewFilename.count() > 0 && targetName) {
+        const displayedName = await previewFilename.textContent();
+        expect(displayedName).toContain(targetName.replace(".md", "").trim());
+      }
     }
   });
 });
