@@ -41,10 +41,17 @@ function readConfig(): UserConfig {
   }
 }
 
+/** Atomic JSON write: write to tmp then rename (prevents corruption on crash) */
+function atomicWriteJson(filePath: string, data: unknown): void {
+  const dir = path.dirname(filePath);
+  fs.mkdirSync(dir, { recursive: true });
+  const tmp = filePath + ".tmp";
+  fs.writeFileSync(tmp, JSON.stringify(data, null, 2), "utf-8");
+  fs.renameSync(tmp, filePath);
+}
+
 function writeConfig(config: UserConfig): void {
-  const configPath = getConfigPath();
-  fs.mkdirSync(path.dirname(configPath), { recursive: true });
-  fs.writeFileSync(configPath, JSON.stringify(config, null, 2), "utf-8");
+  atomicWriteJson(getConfigPath(), config);
 }
 
 // --- Fold state persistence ---
@@ -99,9 +106,7 @@ function flushFoldState(): void {
     for (const k of toRemove) delete foldStateCache.entries[k];
   }
   try {
-    const foldPath = getFoldStatePath();
-    fs.mkdirSync(path.dirname(foldPath), { recursive: true });
-    fs.writeFileSync(foldPath, JSON.stringify(foldStateCache, null, 2), "utf-8");
+    atomicWriteJson(getFoldStatePath(), foldStateCache);
   } catch {
     // Non-critical — fold state loss is acceptable
   }
@@ -117,7 +122,7 @@ function rebuildLinkIndex(): void {
     linkIndex = null;
     return;
   }
-  linkIndex = buildLinkIndex(roots, collectMarkdownFiles);
+  linkIndex = buildLinkIndex(roots, collectMarkdownFiles, allowedRoots);
 }
 
 function notifyLinkGraphChanged(affectedPaths: Set<string>): void {

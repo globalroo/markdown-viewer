@@ -49,14 +49,17 @@ export interface LinkIndexState {
   linkContexts: Map<string, Map<string, LinkContext[]>>;
   /** Map from lowercase filename stem to absolute paths (for wiki-link resolution) */
   filenameLookup: Map<string, string[]>;
+  /** Allowed project roots for path traversal prevention */
+  allowedRoots: Set<string>;
 }
 
-export function createLinkIndex(): LinkIndexState {
+export function createLinkIndex(allowedRoots?: Set<string>): LinkIndexState {
   return {
     forwardLinks: new Map(),
     backLinks: new Map(),
     linkContexts: new Map(),
     filenameLookup: new Map(),
+    allowedRoots: allowedRoots || new Set(),
   };
 }
 
@@ -97,13 +100,25 @@ function commonPrefixLength(a: string, b: string): number {
   return i;
 }
 
+/** Check if a resolved path falls within any allowed root */
+function isWithinRoots(resolvedPath: string, allowedRoots: Set<string>): boolean {
+  for (const root of allowedRoots) {
+    if (resolvedPath === root) return true;
+    const prefix = root.endsWith(path.sep) ? root : root + path.sep;
+    if (resolvedPath.startsWith(prefix)) return true;
+  }
+  return false;
+}
+
 /**
  * Extract links from markdown content. Returns resolved absolute target paths.
+ * Paths outside allowedRoots are filtered out to prevent path traversal.
  */
 export function extractLinksFromContent(
   content: string,
   filePath: string,
-  filenameLookup: Map<string, string[]>
+  filenameLookup: Map<string, string[]>,
+  allowedRoots?: Set<string>
 ): { target: string; context: LinkContext }[] {
   const results: { target: string; context: LinkContext }[] = [];
   const sourceDir = path.dirname(filePath);
@@ -132,6 +147,9 @@ export function extractLinksFromContent(
         if (!path.extname(resolved)) resolved += ".md";
         if (!MARKDOWN_EXTENSIONS.test(resolved)) continue;
         resolved = path.normalize(resolved);
+
+        // Filter out paths that escape allowed project roots
+        if (allowedRoots && !isWithinRoots(resolved, allowedRoots)) continue;
 
         const line = findLineNumber(content, token.raw, lineOffset);
         results.push({
@@ -193,9 +211,11 @@ function buildFilenameLookup(allFiles: string[]): Map<string, string[]> {
  */
 export function buildLinkIndex(
   rootPaths: string[],
-  collectMarkdownFiles: (dir: string) => string[]
+  collectMarkdownFiles: (dir: string) => string[],
+  allowedRoots?: Set<string>
 ): LinkIndexState {
-  const state = createLinkIndex();
+  const roots = allowedRoots || new Set(rootPaths);
+  const state = createLinkIndex(roots);
   const allFiles: string[] = [];
   for (const root of rootPaths) {
     allFiles.push(...collectMarkdownFiles(root));
@@ -216,7 +236,7 @@ export function buildLinkIndex(
 }
 
 function indexFileContent(state: LinkIndexState, filePath: string, content: string): void {
-  const links = extractLinksFromContent(content, filePath, state.filenameLookup);
+  const links = extractLinksFromContent(content, filePath, state.filenameLookup, state.allowedRoots);
 
   const targets = new Set<string>();
   const contexts = new Map<string, LinkContext[]>();
@@ -361,8 +381,13 @@ export function getLinkGraph(state: LinkIndexState, filePath: string): LinkGraph
   }
 
   // Check existence and modification time for each outgoing link
+  // Only stat paths within allowed roots (path traversal prevention)
   const outgoingStatus: Record<string, LinkStatus> = {};
   for (const target of outgoing) {
+    if (state.allowedRoots.size > 0 && !isWithinRoots(target, state.allowedRoots)) {
+      outgoingStatus[target] = { exists: false, lastModified: null };
+      continue;
+    }
     try {
       const stat = fs.statSync(target);
       outgoingStatus[target] = { exists: true, lastModified: stat.mtimeMs };
