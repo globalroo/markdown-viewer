@@ -1892,7 +1892,7 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 12px;
+  padding: 0.6em 0.9em;
   font-size: 0.85em;
   font-weight: 600;
   text-transform: uppercase;
@@ -1907,7 +1907,7 @@ body {
   border: none;
   cursor: pointer;
   color: var(--text-muted);
-  padding: 2px;
+  padding: 0.15em;
   border-radius: 3px;
   display: flex;
   align-items: center;
@@ -1942,7 +1942,7 @@ body {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 4px 0;
+  padding: 0.3em 0;
   scrollbar-width: thin;
   scrollbar-color: var(--scrollbar-thumb) transparent;
 }
@@ -1950,8 +1950,8 @@ body {
 .outline-item {
   display: block;
   width: 100%;
-  padding: 3px 8px;
-  padding-right: 12px;
+  padding: 0.23em 0.6em;
+  padding-right: 0.9em;
   background: none;
   border: none;
   font-size: 0.92em;
@@ -2152,13 +2152,13 @@ body {
   gap: 0;
   background: var(--bg-input, var(--bg-hover));
   border-radius: 4px;
-  padding: 1px;
+  padding: 0.08em;
 }
 
 .outline-segment {
   background: none;
   border: none;
-  padding: 2px 8px;
+  padding: 0.15em 0.6em;
   font-size: 0.77em;
   font-weight: 600;
   text-transform: uppercase;
@@ -2180,7 +2180,7 @@ body {
 }
 
 .outline-empty {
-  padding: 12px;
+  padding: 0.9em;
   font-size: 0.92em;
   color: var(--text-muted);
   text-align: center;
@@ -2190,24 +2190,24 @@ body {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 4px 0;
+  padding: 0.3em 0;
   scrollbar-width: thin;
   scrollbar-color: var(--scrollbar-thumb) transparent;
 }
 
 .links-panel-empty {
-  padding: 16px;
+  padding: 1.2em;
   font-size: 0.92em;
   color: var(--text-muted);
   text-align: center;
 }
 
 .links-section {
-  margin-bottom: 8px;
+  margin-bottom: 0.6em;
 }
 
 .links-section-header {
-  padding: 4px 12px;
+  padding: 0.3em 0.9em;
   font-size: 0.77em;
   font-weight: 600;
   text-transform: uppercase;
@@ -2216,7 +2216,7 @@ body {
 }
 
 .links-empty {
-  padding: 4px 12px;
+  padding: 0.3em 0.9em;
   font-size: 0.92em;
   color: var(--text-muted);
   font-style: italic;
@@ -2225,9 +2225,9 @@ body {
 .link-item {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 0.46em;
   width: 100%;
-  padding: 3px 12px;
+  padding: 0.23em 0.9em;
   background: none;
   border: none;
   font-size: 0.92em;
@@ -2303,9 +2303,9 @@ body {
 .links-filter-pill {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 12px;
-  margin: 0 8px 4px;
+  gap: 0.46em;
+  padding: 0.3em 0.9em;
+  margin: 0 0.6em 0.3em;
   background: var(--accent-subtle, var(--bg-selected));
   border: 1px solid var(--accent, var(--border-color));
   border-radius: 16px;
@@ -2318,7 +2318,7 @@ body {
   background: transparent;
   border: 1px solid var(--border-color);
   border-radius: 3px;
-  padding: 0 2px;
+  padding: 0 0.15em;
   font-size: 0.77em;
   color: inherit;
   cursor: pointer;
@@ -2329,7 +2329,7 @@ body {
   border: none;
   cursor: pointer;
   color: inherit;
-  padding: 1px;
+  padding: 0.08em;
   display: flex;
   align-items: center;
   opacity: 0.7;
@@ -2340,12 +2340,12 @@ body {
 }
 
 .links-filter-toggle {
-  padding: 4px 12px 8px;
+  padding: 0.3em 0.9em 0.6em;
 }
 
 .links-filter-btn {
   width: 100%;
-  padding: 4px 8px;
+  padding: 0.3em 0.6em;
   background: none;
   border: 1px solid var(--border-color);
   border-radius: 4px;
