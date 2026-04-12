@@ -102,7 +102,9 @@ function commonPrefixLength(a: string, b: string): number {
 
 /** Check if a resolved path falls within any allowed root (canonicalized) */
 function isWithinRoots(resolvedPath: string, allowedRoots: Set<string>): boolean {
-  // Canonicalize to handle symlinks — fall back to normalize if file doesn't exist
+  // Canonicalize to handle symlinks — fall back to normalize if file doesn't exist yet.
+  // Non-existent targets use normalized path, which is safe because the root IS
+  // canonicalized (it exists) and prefix comparison still prevents traversal.
   let canonical: string;
   try {
     canonical = fs.realpathSync(resolvedPath);

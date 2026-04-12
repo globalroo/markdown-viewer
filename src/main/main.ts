@@ -109,7 +109,8 @@ function flushFoldState(): void {
     atomicWriteJson(getFoldStatePath(), foldStateCache);
     foldStateDirty = false;
   } catch {
-    // Keep foldStateDirty = true so next flush retries
+    // Keep foldStateDirty = true and re-arm the timer so next flush retries
+    scheduleFoldStateWrite();
   }
 }
 
