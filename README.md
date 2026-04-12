@@ -40,9 +40,9 @@
 
 Pre-built binaries are automatically built on each release via GitHub Actions and are available on the [Releases](https://github.com/globalroo/markdown-viewer/releases) page:
 
-- **macOS**: `.dmg` installer
-- **Windows**: `.exe` installer (NSIS)
+- **macOS**: `.dmg` installer (signed and notarised, Apple Silicon and Intel)
 - **Linux**: `.AppImage` portable binary and `.deb` package
+- **Windows**: No pre-built binary — see [Build from Source](#build-from-source) below
 
 ## Build from Source
 

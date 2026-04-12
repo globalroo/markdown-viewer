@@ -47,7 +47,13 @@
       "target": [
         "dmg",
         "zip"
-      ]
+      ],
+      "identity": "Tammy Davies (GSKV3U57L9)",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "notarize": true
     },
     "win": {
       "target": [
