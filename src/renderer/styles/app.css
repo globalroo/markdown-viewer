@@ -2049,7 +2049,7 @@ body {
   align-items: center;
   gap: 4px;
   width: 100%;
-  padding: 4px 24px;
+  padding: 0.35em 1.5em;
   background: none;
   border: none;
   cursor: pointer;
@@ -2071,12 +2071,12 @@ body {
 /* Indent nested headings + left-border spine for depth cues.
    Fallback borders use var(--accent, var(--border-color)) for browsers
    or cases where --accent is undefined. color-mix() progressives follow. */
-.collapsible-heading-row-L1 { border-left: 3px solid var(--accent, var(--border-color)); padding-bottom: 6px; border-bottom: 1px solid var(--border-color); margin-bottom: 2px; }
-.collapsible-heading-row-L2 { padding-left: 38px; border-left: 3px solid var(--accent, var(--border-color)); }
-.collapsible-heading-row-L3 { padding-left: 52px; border-left: 2px solid var(--accent, var(--border-color)); }
-.collapsible-heading-row-L4 { padding-left: 66px; border-left: 2px solid var(--border-color); }
-.collapsible-heading-row-L5 { padding-left: 80px; border-left: 1px solid var(--border-color); }
-.collapsible-heading-row-L6 { padding-left: 94px; border-left: 1px solid var(--border-color); }
+.collapsible-heading-row-L1 { border-left: 3px solid var(--accent, var(--border-color)); padding-bottom: 0.4em; border-bottom: 1px solid var(--border-color); margin-bottom: 0.15em; }
+.collapsible-heading-row-L2 { padding-left: 2.4em; border-left: 3px solid var(--accent, var(--border-color)); }
+.collapsible-heading-row-L3 { padding-left: 3.25em; border-left: 2px solid var(--accent, var(--border-color)); }
+.collapsible-heading-row-L4 { padding-left: 4.1em; border-left: 2px solid var(--border-color); }
+.collapsible-heading-row-L5 { padding-left: 5em; border-left: 1px solid var(--border-color); }
+.collapsible-heading-row-L6 { padding-left: 5.9em; border-left: 1px solid var(--border-color); }
 
 /* Progressive enhancement: use color-mix() where supported for fading spine */
 @supports (border-color: color-mix(in srgb, red 50%, transparent)) {
@@ -2091,8 +2091,8 @@ body {
   transition: transform 0.15s ease;
   color: var(--text-muted);
   opacity: 0.4;
-  margin-left: -16px;
-  margin-right: 6px;
+  margin-left: -1em;
+  margin-right: 0.4em;
 }
 
 .collapsible-heading-row:hover .collapsible-chevron {
@@ -2117,13 +2117,15 @@ body {
   pointer-events: none;
 }
 
-/* Compressed document hierarchy — heading sizes and weights */
+/* Compressed document hierarchy — heading sizes and weights.
+   All levels must be visibly larger/bolder than body text (0.88em/400).
+   Floor at 0.95em prevents size inversion with body content. */
 .collapsible-heading-text-L1 { font-size: 1.6em; font-weight: 700; }
-.collapsible-heading-text-L2 { font-size: 1.3em; font-weight: 700; }
-.collapsible-heading-text-L3 { font-size: 1.1em; font-weight: 600; }
-.collapsible-heading-text-L4 { font-size: 1.0em; font-weight: 600; }
-.collapsible-heading-text-L5 { font-size: 0.92em; font-weight: 500; }
-.collapsible-heading-text-L6 { font-size: 0.85em; font-weight: 500; }
+.collapsible-heading-text-L2 { font-size: 1.4em; font-weight: 700; }
+.collapsible-heading-text-L3 { font-size: 1.22em; font-weight: 700; }
+.collapsible-heading-text-L4 { font-size: 1.1em; font-weight: 600; }
+.collapsible-heading-text-L5 { font-size: 1.0em; font-weight: 600; }
+.collapsible-heading-text-L6 { font-size: 0.95em; font-weight: 600; }
 
 /* Line count badges: hidden by default, show on hover/focus */
 .collapsible-line-count {
@@ -2160,21 +2162,22 @@ body {
   min-height: 0;
 }
 
-/* Content prose: indented deeper than its heading, with visual containment.
-   Uses em units so spacing scales with font size. */
+/* Content prose: clear indent from heading with border for containment.
+   Left padding gives paragraphs breathing room from the border line.
+   Lists/blockquotes add their own internal indent on top of this. */
 .collapsible-section-content {
-  padding: 0.5em 1.5em 1em 2.25em;
-  margin-bottom: 0.5em;
+  padding: 0.25em 1em 0.4em 1em;
+  margin-bottom: 0.2em;
   border-left: 1px solid var(--border-color);
-  margin-left: 1.5em;
+  margin-left: 0.3em;
+  font-size: 0.88em;
 }
 
-/* Match content indent to heading level */
-.collapsible-section-L2 > .collapsible-section-body .collapsible-section-content { margin-left: 2.4em; padding-left: 3.1em; }
-.collapsible-section-L3 > .collapsible-section-body .collapsible-section-content { margin-left: 3.25em; padding-left: 4em; }
-.collapsible-section-L4 > .collapsible-section-body .collapsible-section-content { margin-left: 4.1em; padding-left: 4.9em; }
-.collapsible-section-L5 > .collapsible-section-body .collapsible-section-content { margin-left: 5em; padding-left: 5.75em; }
-.collapsible-section-L6 > .collapsible-section-body .collapsible-section-content { margin-left: 5.9em; padding-left: 6.6em; }
+/* Reduce list indent inside collapsible content to prevent double-indent */
+.collapsible-section-content ul,
+.collapsible-section-content ol {
+  padding-left: 1.2em;
+}
 
 /* Skip animation for batch expand/collapse */
 .no-transition .collapsible-section-body {

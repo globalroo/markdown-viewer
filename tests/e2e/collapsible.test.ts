@@ -178,6 +178,81 @@ test.beforeAll(() => {
       "",
     ].join("\n")
   );
+
+  // Comprehensive layout test document — every content type under headings
+  fs.writeFileSync(
+    path.join(testDir, "layout-test.md"),
+    [
+      "# Paragraphs Only",
+      "",
+      "This section has only plain paragraph text. It should be clearly",
+      "indented from the heading above with a visible left border.",
+      "",
+      "A second paragraph to verify spacing between paragraphs.",
+      "",
+      "# Bullet Lists",
+      "",
+      "- First bullet item",
+      "- Second bullet item",
+      "- Third bullet item with longer text that might wrap to a second line",
+      "",
+      "# Numbered Lists",
+      "",
+      "1. First numbered item",
+      "2. Second numbered item",
+      "3. Third numbered item",
+      "",
+      "# Mixed Content",
+      "",
+      "Opening paragraph before the list.",
+      "",
+      "- Bullet after paragraph",
+      "- Another bullet",
+      "",
+      "Closing paragraph after the list.",
+      "",
+      "# Code Block",
+      "",
+      "```javascript",
+      "function hello() {",
+      '  console.log("world");',
+      "}",
+      "```",
+      "",
+      "# Blockquote",
+      "",
+      "> This is a blockquote. It should be visually contained within the",
+      "> section content area without excessive indentation.",
+      "",
+      "# Nested Lists",
+      "",
+      "- Top level",
+      "  - Nested item",
+      "    - Deeply nested",
+      "  - Another nested",
+      "- Back to top",
+      "",
+      "## Sub with Paragraphs",
+      "",
+      "Paragraph under an h2 inside an h1. The indentation should still be",
+      "clear and readable without excessive left margin.",
+      "",
+      "## Sub with Bullets",
+      "",
+      "- Sub-section bullet one",
+      "- Sub-section bullet two",
+      "",
+      "### Deep with Mixed",
+      "",
+      "A paragraph under h3.",
+      "",
+      "- Then a bullet list",
+      "- With multiple items",
+      "",
+      "Then another paragraph.",
+      "",
+    ].join("\n")
+  );
 });
 
 test.afterAll(() => {
@@ -570,17 +645,19 @@ test.describe("Heading Hierarchy & Styling", () => {
     expect(h2Size).toBeGreaterThan(h3Size);
   });
 
-  test("h1 has heavier font weight than h3", async () => {
+  test("heading weights form a clear hierarchy", async () => {
     await openTestFolder();
     await selectFileByName("test-collapse.md");
     await enableCollapsibleMode();
 
     const h1Weight = await page.locator(".collapsible-heading-text-L1").first()
       .evaluate((el) => parseInt(getComputedStyle(el).fontWeight));
-    const h3Weight = await page.locator(".collapsible-heading-text-L3").first()
+    const h2Weight = await page.locator(".collapsible-heading-text-L2").first()
       .evaluate((el) => parseInt(getComputedStyle(el).fontWeight));
 
-    expect(h1Weight).toBeGreaterThan(h3Weight);
+    // L1 and L2 should both be bold (700)
+    expect(h1Weight).toBeGreaterThanOrEqual(700);
+    expect(h2Weight).toBeGreaterThanOrEqual(700);
   });
 
   test("heading rows have left-border spine", async () => {
@@ -629,7 +706,7 @@ test.describe("Heading Hierarchy & Styling", () => {
 // ===========================================================================
 
 test.describe("Content Indentation & Scaling", () => {
-  test("expanded content is indented further than its heading", async () => {
+  test("expanded content has visible left border and padding", async () => {
     await openTestFolder();
     await selectFileByName("test-collapse.md");
     await enableCollapsibleMode();
@@ -639,20 +716,20 @@ test.describe("Content Indentation & Scaling", () => {
     await installRow.click();
     await page.waitForTimeout(300);
 
-    // Get heading padding-left
-    const headingPadding = await installRow.evaluate(
-      (el) => parseFloat(getComputedStyle(el).paddingLeft)
-    );
-
-    // Get content margin-left (the visual indent)
     const content = page.locator(".collapsible-section-content").first();
     await expect(content).toBeVisible();
-    const contentMargin = await content.evaluate(
-      (el) => parseFloat(getComputedStyle(el).marginLeft)
-    );
 
-    // Content should be indented at least as much as the heading
-    expect(contentMargin).toBeGreaterThanOrEqual(headingPadding * 0.8);
+    // Content should have left border for containment
+    const borderLeft = await content.evaluate(
+      (el) => parseFloat(getComputedStyle(el).borderLeftWidth)
+    );
+    expect(borderLeft).toBeGreaterThan(0);
+
+    // Content should have left padding so text is offset from border
+    const paddingLeft = await content.evaluate(
+      (el) => parseFloat(getComputedStyle(el).paddingLeft)
+    );
+    expect(paddingLeft).toBeGreaterThan(5);
   });
 
   test("expanded content has left border for visual containment", async () => {
@@ -754,34 +831,319 @@ test.describe("Content Indentation & Scaling", () => {
     expect(marginAfter).toBeLessThan(marginBefore);
   });
 
-  test("deeper heading levels have more content indentation", async () => {
+  test("content at different heading levels has consistent indent", async () => {
     await openTestFolder();
     await selectFileByName("test-collapse.md");
     await enableCollapsibleMode();
 
-    // Expand L1 and L2 sections to get content at different levels
-    // Expand "Getting Started" (L1)
+    // Expand L1 and L2 sections
     await page.locator(".collapsible-heading-row").first().click();
     await page.waitForTimeout(200);
-    // Expand "Installation" (L2)
     const installRow = page.locator('.collapsible-heading-row:has(.collapsible-heading-text:text-is("Installation"))');
     await installRow.click();
     await page.waitForTimeout(200);
 
-    // Get all visible content sections
+    // Both content sections should have border-left for containment
     const contents = page.locator(".collapsible-section-content");
     const count = await contents.count();
-    if (count >= 2) {
-      const margins: number[] = [];
-      for (let i = 0; i < Math.min(count, 2); i++) {
-        const m = await contents.nth(i).evaluate(
-          (el) => parseFloat(getComputedStyle(el).marginLeft)
-        );
-        margins.push(m);
-      }
-      // L2 content should be indented more than L1 content
-      expect(margins[1]).toBeGreaterThan(margins[0]);
+    expect(count).toBeGreaterThanOrEqual(2);
+
+    for (let i = 0; i < Math.min(count, 2); i++) {
+      const border = await contents.nth(i).evaluate(
+        (el) => parseFloat(getComputedStyle(el).borderLeftWidth)
+      );
+      expect(border).toBeGreaterThan(0);
     }
+  });
+});
+
+// ===========================================================================
+// 4c. CONTENT LAYOUT VERIFICATION (all content types)
+// ===========================================================================
+
+test.describe("Content Layout Verification", () => {
+  // Helper: expand a heading by text and return its content element
+  async function expandAndGetContent(headingText: string) {
+    const row = page.locator(`.collapsible-heading-row:has(.collapsible-heading-text:text-is("${headingText}"))`);
+    await row.click();
+    await page.waitForTimeout(400);
+    // Find the section body next to this heading's parent
+    const section = page.locator(`.collapsible-section:has(.collapsible-heading-text:text-is("${headingText}"))`).first();
+    return section.locator(".collapsible-section-content").first();
+  }
+
+  test("paragraph content is visibly indented from heading", async () => {
+    await openTestFolder();
+    await selectFileByName("layout-test.md");
+    await enableCollapsibleMode();
+
+    const content = await expandAndGetContent("Paragraphs Only");
+    await expect(content).toBeVisible();
+
+    // Content should have left padding > 0 (text offset from border)
+    const paddingLeft = await content.evaluate(
+      (el) => parseFloat(getComputedStyle(el).paddingLeft)
+    );
+    expect(paddingLeft).toBeGreaterThan(5);
+
+    // Content should have a left border
+    const borderLeft = await content.evaluate(
+      (el) => parseFloat(getComputedStyle(el).borderLeftWidth)
+    );
+    expect(borderLeft).toBeGreaterThan(0);
+
+    // Content text should not extend beyond the heading text start
+    const headingLeft = await page.locator('.collapsible-heading-text:text-is("Paragraphs Only")')
+      .evaluate((el) => el.getBoundingClientRect().left);
+    const contentLeft = await content.evaluate(
+      (el) => el.getBoundingClientRect().left
+    );
+    // Content's left edge (border line) can be slightly left of heading,
+    // but the text inside (border + padding) should be near the heading start
+    const contentTextLeft = await content.evaluate(
+      (el) => el.getBoundingClientRect().left + parseFloat(getComputedStyle(el).paddingLeft)
+    );
+    expect(contentTextLeft).toBeGreaterThanOrEqual(headingLeft - 20);
+  });
+
+  test("bullet list is not excessively indented", async () => {
+    await openTestFolder();
+    await selectFileByName("layout-test.md");
+    await enableCollapsibleMode();
+
+    const content = await expandAndGetContent("Bullet Lists");
+    await expect(content).toBeVisible();
+
+    // Get the bullet text position
+    const bulletLeft = await content.locator("li").first().evaluate(
+      (el) => el.getBoundingClientRect().left
+    );
+    // Get the heading text position
+    const headingLeft = await page.locator('.collapsible-heading-text:text-is("Bullet Lists")')
+      .evaluate((el) => el.getBoundingClientRect().left);
+
+    // Bullet text should not be more than ~80px (5em) further right than heading
+    // This catches double-indent issues
+    expect(bulletLeft - headingLeft).toBeLessThan(80);
+  });
+
+  test("numbered list has similar indent to bullet list", async () => {
+    await openTestFolder();
+    await selectFileByName("layout-test.md");
+    await enableCollapsibleMode();
+
+    const bulletContent = await expandAndGetContent("Bullet Lists");
+    const bulletLeft = await bulletContent.locator("li").first().evaluate(
+      (el) => el.getBoundingClientRect().left
+    );
+
+    const numContent = await expandAndGetContent("Numbered Lists");
+    const numLeft = await numContent.locator("li").first().evaluate(
+      (el) => el.getBoundingClientRect().left
+    );
+
+    // Both list types should have similar indentation (within 15px)
+    expect(Math.abs(bulletLeft - numLeft)).toBeLessThan(15);
+  });
+
+  test("mixed content (paragraph + bullets + paragraph) reads naturally", async () => {
+    await openTestFolder();
+    await selectFileByName("layout-test.md");
+    await enableCollapsibleMode();
+
+    const content = await expandAndGetContent("Mixed Content");
+    await expect(content).toBeVisible();
+
+    // Should contain paragraphs and list items
+    const paragraphs = content.locator("p");
+    const listItems = content.locator("li");
+    expect(await paragraphs.count()).toBeGreaterThan(0);
+    expect(await listItems.count()).toBeGreaterThan(0);
+
+    // First paragraph left should be similar to bullet text left
+    const paraLeft = await paragraphs.first().evaluate(
+      (el) => el.getBoundingClientRect().left
+    );
+    const bulletTextLeft = await listItems.first().evaluate((el) => {
+      // Get the text node position, not the li (which includes the bullet marker)
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      return range.getBoundingClientRect().left;
+    });
+
+    // Paragraph and bullet text should start within reasonable range of each other
+    expect(Math.abs(paraLeft - bulletTextLeft)).toBeLessThan(40);
+  });
+
+  test("code block fits within content area", async () => {
+    await openTestFolder();
+    await selectFileByName("layout-test.md");
+    await enableCollapsibleMode();
+
+    const content = await expandAndGetContent("Code Block");
+    await expect(content).toBeVisible();
+
+    const codeBlock = content.locator("pre");
+    await expect(codeBlock).toBeVisible();
+
+    // Code block should not overflow the content area
+    const contentRight = await content.evaluate(
+      (el) => el.getBoundingClientRect().right
+    );
+    const codeRight = await codeBlock.evaluate(
+      (el) => el.getBoundingClientRect().right
+    );
+    expect(codeRight).toBeLessThanOrEqual(contentRight + 2); // small tolerance
+  });
+
+  test("blockquote is contained within content area", async () => {
+    await openTestFolder();
+    await selectFileByName("layout-test.md");
+    await enableCollapsibleMode();
+
+    const content = await expandAndGetContent("Blockquote");
+    await expect(content).toBeVisible();
+
+    const blockquote = content.locator("blockquote");
+    await expect(blockquote).toBeVisible();
+
+    // Blockquote left should be indented from content left (its own border)
+    const contentLeft = await content.evaluate(
+      (el) => el.getBoundingClientRect().left
+    );
+    const bqLeft = await blockquote.evaluate(
+      (el) => el.getBoundingClientRect().left
+    );
+    expect(bqLeft).toBeGreaterThan(contentLeft);
+  });
+
+  test("nested lists don't overflow or over-indent", async () => {
+    await openTestFolder();
+    await selectFileByName("layout-test.md");
+    await enableCollapsibleMode();
+
+    const content = await expandAndGetContent("Nested Lists");
+    await expect(content).toBeVisible();
+
+    // Get the deepest nested item
+    const allItems = content.locator("li");
+    const count = await allItems.count();
+    expect(count).toBeGreaterThanOrEqual(5);
+
+    // Deepest nested item should still be visible and not pushed off screen
+    const deepestLeft = await allItems.last().evaluate(
+      (el) => el.getBoundingClientRect().left
+    );
+    const contentRight = await content.evaluate(
+      (el) => el.getBoundingClientRect().right
+    );
+    // The deepest item should have room for at least 100px of text
+    expect(contentRight - deepestLeft).toBeGreaterThan(100);
+  });
+
+  test("h2 sub-section content has appropriate indent", async () => {
+    await openTestFolder();
+    await selectFileByName("layout-test.md");
+    await enableCollapsibleMode();
+
+    const content = await expandAndGetContent("Sub with Paragraphs");
+    await expect(content).toBeVisible();
+
+    // Content text should be visible and positioned near the heading
+    const headingLeft = await page.locator('.collapsible-heading-text:text-is("Sub with Paragraphs")')
+      .evaluate((el) => el.getBoundingClientRect().left);
+    const contentTextLeft = await content.evaluate(
+      (el) => el.getBoundingClientRect().left + parseFloat(getComputedStyle(el).paddingLeft)
+    );
+    // Content text should start within reasonable range of heading
+    expect(Math.abs(contentTextLeft - headingLeft)).toBeLessThan(60);
+  });
+
+  test("h3 deep section with mixed content reads well", async () => {
+    await openTestFolder();
+    await selectFileByName("layout-test.md");
+    await enableCollapsibleMode();
+
+    const content = await expandAndGetContent("Deep with Mixed");
+    await expect(content).toBeVisible();
+
+    // Should have both paragraphs and list items
+    const paragraphs = content.locator("p");
+    const listItems = content.locator("li");
+    expect(await paragraphs.count()).toBeGreaterThan(0);
+    expect(await listItems.count()).toBeGreaterThan(0);
+  });
+
+  test("all content types maintain readable width at default font size", async () => {
+    await openTestFolder();
+    await selectFileByName("layout-test.md");
+    await enableCollapsibleMode();
+
+    // Expand all sections
+    await page.click('.collapsible-control-btn:text-is("Expand All")');
+    await page.waitForTimeout(500);
+
+    // Every content section should have reasonable width
+    const contents = page.locator(".collapsible-section-content");
+    const count = await contents.count();
+    expect(count).toBeGreaterThan(0);
+
+    for (let i = 0; i < count; i++) {
+      const rect = await contents.nth(i).evaluate((el) => {
+        const r = el.getBoundingClientRect();
+        return { width: r.width, left: r.left };
+      });
+      // Each content section should be at least 200px wide
+      expect(rect.width).toBeGreaterThan(200);
+    }
+  });
+
+  test("content indentation consistent at larger font size", async () => {
+    await openTestFolder();
+    await selectFileByName("layout-test.md");
+    await enableCollapsibleMode();
+
+    // Increase font size
+    await page.click('.toolbar-btn:text-is("A+")');
+    await page.click('.toolbar-btn:text-is("A+")');
+    await page.waitForTimeout(200);
+
+    const content = await expandAndGetContent("Paragraphs Only");
+    await expect(content).toBeVisible();
+
+    // Content should still have left padding and border
+    const paddingLeft = await content.evaluate(
+      (el) => parseFloat(getComputedStyle(el).paddingLeft)
+    );
+    expect(paddingLeft).toBeGreaterThan(5);
+
+    // Content should still have readable width
+    const width = await content.evaluate(
+      (el) => el.getBoundingClientRect().width
+    );
+    expect(width).toBeGreaterThan(150);
+  });
+
+  test("content indentation consistent at smaller font size", async () => {
+    await openTestFolder();
+    await selectFileByName("layout-test.md");
+    await enableCollapsibleMode();
+
+    // Decrease font size
+    await page.click('.toolbar-btn:text-is("A-")');
+    await page.click('.toolbar-btn:text-is("A-")');
+    await page.waitForTimeout(200);
+
+    const content = await expandAndGetContent("Bullet Lists");
+    await expect(content).toBeVisible();
+
+    // Bullets should still not be excessively indented
+    const bulletLeft = await content.locator("li").first().evaluate(
+      (el) => el.getBoundingClientRect().left
+    );
+    const headingLeft = await page.locator('.collapsible-heading-text:text-is("Bullet Lists")')
+      .evaluate((el) => el.getBoundingClientRect().left);
+    expect(bulletLeft - headingLeft).toBeLessThan(80);
   });
 });
 
