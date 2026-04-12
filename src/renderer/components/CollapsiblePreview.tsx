@@ -361,6 +361,9 @@ export function CollapsiblePreview({ sectionModel, selectedFile, onClick }: Coll
           break;
         }
         case "Escape": {
+          // Don't collapse individual sections during search-expanded state —
+          // let the global search handler restore the pre-search state instead
+          if (searchExpanded) break;
           if (focusedId && expandedSet.has(focusedId)) {
             e.preventDefault();
             toggle(focusedId);
@@ -382,7 +385,7 @@ export function CollapsiblePreview({ sectionModel, selectedFile, onClick }: Coll
 
     container.addEventListener("keydown", handleKeyDown);
     return () => container.removeEventListener("keydown", handleKeyDown);
-  }, [sectionModel.flatHeadings, focusedId, expandedSet, toggle, expandAll, collapseAll]);
+  }, [sectionModel.flatHeadings, focusedId, expandedSet, toggle, expandAll, collapseAll, searchExpanded]);
 
   // Cmd+F: expand all sections so native browser find can search content
   useEffect(() => {
