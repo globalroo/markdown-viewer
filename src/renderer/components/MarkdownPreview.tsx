@@ -747,19 +747,19 @@ export function MarkdownPreview() {
     for (const project of state.projects) {
       const found = findInTree(project.tree);
       if (found) {
+        // Use openTab + selectFile only — the useEffect in this component
+        // handles file reading and the dirty-draft save/discard guard.
+        state.openTab(found);
         state.selectFile(found);
-        window.api.readFile(found).then((content) => {
-          useAppStore.getState().setMarkdownContent(content);
-        });
         return;
       }
     }
   }, []);
 
   const handleExportHTML = useCallback(async () => {
-    // In edit mode, render export HTML from the current draft on demand.
-    // This ensures exports always reflect what the user is working on.
-    const exportHtml = html || (editDirty && sectionModel && selectedFile
+    // In edit mode, always render from editContent on demand (whether dirty or just saved).
+    // editMode stays true after save, so we can't rely on editDirty alone.
+    const exportHtml = html || (editMode && editContent && selectedFile
       ? renderMarkdownFromModel(buildSectionModel(editContent, selectedFile), selectedFile)
       : lastRenderedHtmlRef.current);
     if (!exportHtml) return;
@@ -787,16 +787,16 @@ export function MarkdownPreview() {
     const rootInlineStyle = root.style.cssText;
     const warmFilter = root.classList.contains("warm-filter");
     await window.api.exportHTML(portableHtml, css, theme, font, rootInlineStyle, warmFilter);
-  }, [html]);
+  }, [html, editMode, editContent, selectedFile, sectionModel]);
 
   const handleExportPDF = useCallback(async () => {
     await window.api.exportPDF();
   }, []);
 
   const handleExportDOCX = useCallback(async () => {
-    // In edit mode, render export HTML from the current draft on demand.
-    // This ensures exports always reflect what the user is working on.
-    const exportHtml = html || (editDirty && sectionModel && selectedFile
+    // In edit mode, always render from editContent on demand (whether dirty or just saved).
+    // editMode stays true after save, so we can't rely on editDirty alone.
+    const exportHtml = html || (editMode && editContent && selectedFile
       ? renderMarkdownFromModel(buildSectionModel(editContent, selectedFile), selectedFile)
       : lastRenderedHtmlRef.current);
     if (!exportHtml) return;
@@ -820,7 +820,7 @@ export function MarkdownPreview() {
     const rootInlineStyle = root.style.cssText;
     const warmFilter = root.classList.contains("warm-filter");
     await window.api.exportDOCX(portableHtml, css, theme, font, rootInlineStyle, warmFilter);
-  }, [html]);
+  }, [html, editMode, editContent, selectedFile, sectionModel]);
 
   const handleSave = useCallback(async () => {
     if (!selectedFile || !editDirty) return;

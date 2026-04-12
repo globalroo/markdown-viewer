@@ -278,22 +278,12 @@ function ContentSearchResults({
   // users can use Cmd+F which already expands all sections for native find.
   const handleClick = useCallback(
     (result: SearchResult) => {
-      selectFile(result.filePath);
-      // Read and display the file, then attempt to scroll to the matching line
-      window.api.readFile(result.filePath).then((content) => {
-        useAppStore.getState().setMarkdownContent(content);
-        // Scroll to approximate position based on line number
-        requestAnimationFrame(() => {
-          const scrollEl = document.querySelector(".preview-scroll");
-          if (!scrollEl) return;
-          const contentEl = scrollEl.querySelector(".preview-content");
-          if (!contentEl) return;
-          const totalLines = content.split("\n").length;
-          const ratio = Math.max(0, (result.line - 1) / totalLines);
-          const scrollTarget = ratio * scrollEl.scrollHeight;
-          scrollEl.scrollTo({ top: scrollTarget, behavior: "smooth" });
-        });
-      });
+      // Use openTab + selectFile only — MarkdownPreview's useEffect handles
+      // file reading and the dirty-draft save/discard guard.
+      const store = useAppStore.getState();
+      store.openTab(result.filePath);
+      store.selectFile(result.filePath);
+      // TODO: scroll to approximate line position after content loads
     },
     [selectFile]
   );
