@@ -2029,7 +2029,6 @@ body {
 }
 
 .collapsible-section {
-  contain: layout style;
 }
 
 .collapsible-heading-row {
