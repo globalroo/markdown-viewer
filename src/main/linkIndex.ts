@@ -105,6 +105,9 @@ function isWithinRoots(resolvedPath: string, allowedRoots: Set<string>): boolean
   // Canonicalize to handle symlinks — fall back to normalize if file doesn't exist yet.
   // Non-existent targets use normalized path, which is safe because the root IS
   // canonicalized (it exists) and prefix comparison still prevents traversal.
+  // NOTE: Symlinked project roots are supported (roots are canonicalized via
+  // realpathSync in addAllowedRoot). Links to not-yet-created files inside
+  // symlinked roots will still pass the boundary check correctly.
   let canonical: string;
   try {
     canonical = fs.realpathSync(resolvedPath);
