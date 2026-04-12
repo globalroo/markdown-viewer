@@ -391,12 +391,16 @@ export function MarkdownPreview() {
   }, [sectionModel]);
 
   // Render HTML using annotated tokens (with canonical heading IDs).
-  // Skip the expensive render when in edit mode — preview is hidden and html unused.
+  // Skip the expensive render when in edit mode — preview is hidden.
   // sectionModel still rebuilds (DocumentOutline and fold-state transfer consume it).
+  // Export handlers use lastRenderedHtml (ref) so exports work even in edit mode.
+  const lastRenderedHtmlRef = useRef("");
   const html = useMemo(() => {
     if (!sectionModel || !selectedFile) return "";
     if (editMode) return "";
-    return renderMarkdownFromModel(sectionModel, selectedFile);
+    const rendered = renderMarkdownFromModel(sectionModel, selectedFile);
+    lastRenderedHtmlRef.current = rendered;
+    return rendered;
   }, [sectionModel, selectedFile, editMode]);
 
   // In collapsible mode, strip heading IDs from the hidden standard content
@@ -681,11 +685,12 @@ export function MarkdownPreview() {
   }, []);
 
   const handleExportHTML = useCallback(async () => {
-    if (!html) return;
+    const exportHtml = html || lastRenderedHtmlRef.current;
+    if (!exportHtml) return;
     // Rewrite local-img:// protocol URLs back to file:// for portability
     // Keep paths URL-encoded so embedLocalImages can parse them correctly
     // (decoding here would break filenames containing # or ?)
-    const portableHtml = html.replace(/local-img:\/\//g, "file://");
+    const portableHtml = exportHtml.replace(/local-img:\/\//g, "file://");
     // Gather computed styles for the preview
     const styleSheets = Array.from(document.styleSheets);
     let css = "";
@@ -713,10 +718,11 @@ export function MarkdownPreview() {
   }, []);
 
   const handleExportDOCX = useCallback(async () => {
-    if (!html) return;
+    const exportHtml = html || lastRenderedHtmlRef.current;
+    if (!exportHtml) return;
     // Keep paths URL-encoded so embedLocalImages can parse them correctly
     // (decoding here would break filenames containing # or ?)
-    const portableHtml = html.replace(/local-img:\/\//g, "file://");
+    const portableHtml = exportHtml.replace(/local-img:\/\//g, "file://");
     const styleSheets = Array.from(document.styleSheets);
     let css = "";
     for (const sheet of styleSheets) {

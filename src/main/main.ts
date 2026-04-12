@@ -117,6 +117,7 @@ function flushFoldState(): void {
 
 // --- Link index ---
 let linkIndex: LinkIndexState | null = null;
+let linkIndexBuildGen = 0;
 
 function rebuildLinkIndex(): void {
   const roots = Array.from(allowedRoots);
@@ -124,9 +125,12 @@ function rebuildLinkIndex(): void {
     linkIndex = null;
     return;
   }
-  // Use async build to yield to event loop between batches, preventing UI freeze
+  // Generation token prevents stale builds from overwriting newer ones
+  const gen = ++linkIndexBuildGen;
   buildLinkIndexAsync(roots, collectMarkdownFiles, allowedRoots).then((index) => {
-    linkIndex = index;
+    if (gen === linkIndexBuildGen) {
+      linkIndex = index;
+    }
   });
 }
 

@@ -101,6 +101,14 @@ describe("extractLinksFromContent", () => {
     expect(results.length).toBe(0);
   });
 
+  it("reports correct line numbers for duplicate identical links", () => {
+    const content = "See [guide](./guide.md) here.\n\nAnd [guide](./guide.md) again.\n";
+    const results = extractLinksFromContent(content, "/project/readme.md", filenameLookup);
+    expect(results.length).toBe(2);
+    expect(results[0].context.line).toBe(1);
+    expect(results[1].context.line).toBe(3);
+  });
+
   it("provides context with line numbers", () => {
     const content = "Line 1\n\nSee [guide](./guide.md) here.\n\nLine 4";
     const results = extractLinksFromContent(content, "/project/readme.md", filenameLookup);
