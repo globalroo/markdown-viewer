@@ -11,6 +11,15 @@ import * as path from "path";
 import * as fs from "fs";
 import { pathToFileURL } from "url";
 import { embedLocalImages } from "./embedLocalImages";
+import {
+  type LinkIndexState,
+  buildLinkIndex,
+  buildLinkIndexAsync,
+  updateLinkIndexForFile,
+  removeFileFromIndex,
+  getLinkGraph,
+  getConnectedPaths,
+} from "./linkIndex";
 
 let mainWindow: BrowserWindow | null = null;
 let pendingFilePath: string | null = null;
@@ -33,11 +42,105 @@ function readConfig(): UserConfig {
   }
 }
 
-function writeConfig(config: UserConfig): void {
-  const configPath = getConfigPath();
-  fs.mkdirSync(path.dirname(configPath), { recursive: true });
-  fs.writeFileSync(configPath, JSON.stringify(config, null, 2), "utf-8");
+/** Atomic JSON write: write to tmp then rename (prevents corruption on crash) */
+function atomicWriteJson(filePath: string, data: unknown): void {
+  const dir = path.dirname(filePath);
+  fs.mkdirSync(dir, { recursive: true });
+  const tmp = filePath + ".tmp";
+  fs.writeFileSync(tmp, JSON.stringify(data, null, 2), "utf-8");
+  fs.renameSync(tmp, filePath);
 }
+
+function writeConfig(config: UserConfig): void {
+  atomicWriteJson(getConfigPath(), config);
+}
+
+// --- Fold state persistence ---
+interface FoldStateEntry {
+  headingIds: Record<string, boolean>;
+  lastAccessed: number;
+}
+
+interface FoldStateStore {
+  entries: Record<string, FoldStateEntry>;
+}
+
+const FOLD_STATE_MAX_ENTRIES = 300;
+
+function getFoldStatePath(): string {
+  return path.join(app.getPath("userData"), "fold-state.json");
+}
+
+let foldStateCache: FoldStateStore | null = null;
+let foldStateDirty = false;
+let foldStateTimer: ReturnType<typeof setTimeout> | null = null;
+
+function loadFoldStateStore(): FoldStateStore {
+  if (foldStateCache) return foldStateCache;
+  try {
+    const raw = fs.readFileSync(getFoldStatePath(), "utf-8");
+    foldStateCache = JSON.parse(raw) as FoldStateStore;
+    if (!foldStateCache.entries) foldStateCache.entries = {};
+  } catch {
+    foldStateCache = { entries: {} };
+  }
+  return foldStateCache;
+}
+
+function scheduleFoldStateWrite(): void {
+  if (foldStateTimer) return;
+  foldStateTimer = setTimeout(() => {
+    foldStateTimer = null;
+    flushFoldState();
+  }, 2000);
+}
+
+function flushFoldState(): void {
+  if (!foldStateDirty || !foldStateCache) return;
+  // LRU eviction
+  const keys = Object.keys(foldStateCache.entries);
+  if (keys.length > FOLD_STATE_MAX_ENTRIES) {
+    const sorted = keys.sort(
+      (a, b) => (foldStateCache!.entries[a].lastAccessed || 0) - (foldStateCache!.entries[b].lastAccessed || 0)
+    );
+    const toRemove = sorted.slice(0, keys.length - FOLD_STATE_MAX_ENTRIES);
+    for (const k of toRemove) delete foldStateCache.entries[k];
+  }
+  try {
+    atomicWriteJson(getFoldStatePath(), foldStateCache);
+    foldStateDirty = false;
+  } catch {
+    // Keep foldStateDirty = true and re-arm the timer so next flush retries
+    scheduleFoldStateWrite();
+  }
+}
+
+// --- Link index ---
+let linkIndex: LinkIndexState | null = null;
+let linkIndexBuildGen = 0;
+
+function rebuildLinkIndex(): void {
+  const roots = Array.from(allowedRoots);
+  // Always increment gen — even zero-root case — so in-flight builds can't restore stale state
+  const gen = ++linkIndexBuildGen;
+  if (roots.length === 0) {
+    linkIndex = null;
+    return;
+  }
+  buildLinkIndexAsync(roots, collectMarkdownFiles, allowedRoots).then((index) => {
+    if (gen === linkIndexBuildGen) {
+      linkIndex = index;
+    }
+  });
+}
+
+function notifyLinkGraphChanged(affectedPaths: Set<string>): void {
+  if (!mainWindow || affectedPaths.size === 0) return;
+  mainWindow.webContents.send("link-graph-changed", Array.from(affectedPaths));
+}
+
+// --- Last-viewed tracking (for stale link detection) ---
+const lastViewed = new Map<string, number>();
 
 // Track allowed project roots for IPC path validation
 const allowedRoots = new Set<string>();
@@ -100,12 +203,15 @@ function startWatching(rootPath: string): void {
       const isMarkdown = /\.(md|markdown|mdown|mkd|mkdn)$/i.test(filename);
 
       if (eventType === "rename") {
-        // A file/directory was added, removed, or renamed — refresh the tree
+        // A file/directory was added, removed, or renamed — refresh tree + link index
         debounced(`tree:${rootPath}`, 150, () => {
           if (!mainWindow) return;
           try {
             const tree = scanDirectory(rootPath);
             mainWindow.webContents.send("tree-changed", rootPath, tree);
+            // Rebuild link index for this root (new/removed files change the graph)
+            rebuildLinkIndex();
+            notifyLinkGraphChanged(new Set(["*"])); // broad notification
           } catch {
             // Directory may have been removed
           }
@@ -113,12 +219,16 @@ function startWatching(rootPath: string): void {
       }
 
       if (eventType === "change" && isMarkdown) {
-        // File content changed — notify renderer
+        // File content changed — notify renderer and update link index
         debounced(`file:${fullPath}`, 150, () => {
           if (!mainWindow) return;
           try {
             const content = readFileContent(fullPath);
             mainWindow.webContents.send("file-changed", fullPath, content);
+            if (linkIndex) {
+              const affected = updateLinkIndexForFile(linkIndex, fullPath, content);
+              notifyLinkGraphChanged(affected);
+            }
           } catch {
             // File may have been deleted between event and read
           }
@@ -332,6 +442,11 @@ ipcMain.handle("open-folder", async () => {
   addAllowedRoot(dirPath);
   const tree = scanDirectory(dirPath);
   startWatching(dirPath);
+  // Build/rebuild link index in background (non-blocking)
+  setTimeout(() => {
+    rebuildLinkIndex();
+    notifyLinkGraphChanged(new Set(["*"]));
+  }, 0);
   return { rootPath: dirPath, tree };
 });
 
@@ -347,6 +462,7 @@ ipcMain.handle(
   "read-file",
   async (_event, filePath: string): Promise<string> => {
     if (!isPathAllowed(filePath)) throw new Error("Access denied");
+    lastViewed.set(path.normalize(filePath), Date.now());
     return readFileContent(filePath);
   }
 );
@@ -381,6 +497,26 @@ ipcMain.handle(
     }
 
     fs.renameSync(oldPath, newPath);
+    // Update link index: remove old, index new, THEN refresh backers
+    // (backers must be re-parsed after the new path is in filenameLookup)
+    if (linkIndex) {
+      const backers = Array.from(linkIndex.backLinks.get(oldPath) || []);
+      const affected = removeFileFromIndex(linkIndex, oldPath);
+      try {
+        const content = fs.readFileSync(newPath, "utf-8");
+        const affected2 = updateLinkIndexForFile(linkIndex, newPath, content);
+        for (const p of affected2) affected.add(p);
+      } catch { /* ignore */ }
+      // Now refresh backers — new path is in lookup, so wiki-links resolve correctly
+      for (const backer of backers) {
+        try {
+          const content = fs.readFileSync(backer, "utf-8");
+          const a = updateLinkIndexForFile(linkIndex, backer, content);
+          for (const p of a) affected.add(p);
+        } catch { /* ignore */ }
+      }
+      notifyLinkGraphChanged(affected);
+    }
     return { newPath };
   }
 );
@@ -417,6 +553,24 @@ ipcMain.handle(
       }
     }
 
+    // Update link index: remove old, index new, THEN refresh backers
+    if (linkIndex) {
+      const backers = Array.from(linkIndex.backLinks.get(sourcePath) || []);
+      const affected = removeFileFromIndex(linkIndex, sourcePath);
+      try {
+        const content = fs.readFileSync(newPath, "utf-8");
+        const affected2 = updateLinkIndexForFile(linkIndex, newPath, content);
+        for (const p of affected2) affected.add(p);
+      } catch { /* ignore */ }
+      for (const backer of backers) {
+        try {
+          const content = fs.readFileSync(backer, "utf-8");
+          const a = updateLinkIndexForFile(linkIndex, backer, content);
+          for (const p of a) affected.add(p);
+        } catch { /* ignore */ }
+      }
+      notifyLinkGraphChanged(affected);
+    }
     return { newPath };
   }
 );
@@ -429,12 +583,22 @@ ipcMain.handle(
       throw new Error("Can only write markdown files");
     }
     fs.writeFileSync(filePath, content, "utf-8");
+    // Update lastViewed so the file doesn't appear stale to its backers
+    lastViewed.set(path.normalize(filePath), Date.now());
+    // Update link index (also serves as Linux fallback since fs.watch is disabled there)
+    if (linkIndex) {
+      const affected = updateLinkIndexForFile(linkIndex, filePath, content);
+      notifyLinkGraphChanged(affected);
+    }
   }
 );
 
 ipcMain.handle("remove-root", async (_event, rootPath: string) => {
   stopWatching(rootPath);
   removeAllowedRoot(rootPath);
+  // Rebuild link index without the removed root
+  rebuildLinkIndex();
+  notifyLinkGraphChanged(new Set(["*"]));
 });
 
 // Content search across all markdown files in given roots
@@ -667,6 +831,49 @@ ipcMain.handle("clear-custom-css", async (): Promise<void> => {
   writeConfig(config);
 });
 
+// --- Fold state IPC handlers ---
+ipcMain.handle("fold-state:load", async (_event, filePath: string): Promise<Record<string, boolean> | null> => {
+  const store = loadFoldStateStore();
+  const normalized = path.normalize(filePath);
+  const entry = store.entries[normalized];
+  if (!entry) return null;
+  entry.lastAccessed = Date.now();
+  foldStateDirty = true;
+  scheduleFoldStateWrite();
+  return entry.headingIds;
+});
+
+ipcMain.handle("fold-state:save", async (_event, filePath: string, headingIds: Record<string, boolean>): Promise<void> => {
+  const store = loadFoldStateStore();
+  const normalized = path.normalize(filePath);
+  store.entries[normalized] = { headingIds, lastAccessed: Date.now() };
+  foldStateDirty = true;
+  scheduleFoldStateWrite();
+});
+
+// --- Link graph IPC handlers ---
+ipcMain.handle("get-link-graph", async (_event, filePath: string) => {
+  if (!isPathAllowed(filePath)) throw new Error("Access denied");
+  if (!linkIndex) return null;
+  const graph = getLinkGraph(linkIndex, path.normalize(filePath));
+  // Annotate with stale status: target was modified after user last viewed it
+  const staleTargets: Record<string, boolean> = {};
+  for (const target of graph.outgoing) {
+    const status = graph.outgoingStatus[target];
+    if (status?.exists && status.lastModified) {
+      const viewedAt = lastViewed.get(target);
+      staleTargets[target] = viewedAt ? status.lastModified > viewedAt : false;
+    }
+  }
+  return { ...graph, staleTargets };
+});
+
+ipcMain.handle("get-connected-paths", async (_event, filePath: string, hops: number) => {
+  if (!isPathAllowed(filePath)) throw new Error("Access denied");
+  if (!linkIndex) return [];
+  return getConnectedPaths(linkIndex, path.normalize(filePath), hops);
+});
+
 // Find the first real file/directory path in an argv slice, skipping Chromium flags.
 // cwd overrides path.resolve base for relative args (used by second-instance).
 function findPathArg(args: string[], cwd?: string): string | null {
@@ -698,6 +905,7 @@ app.on("open-file", (_event, filePath) => {
     const dirPath = path.dirname(filePath);
     addAllowedRoot(dirPath);
     startWatching(dirPath);
+    setTimeout(() => { rebuildLinkIndex(); notifyLinkGraphChanged(new Set(["*"])); }, 0);
     mainWindow.webContents.send("file-opened", filePath);
   } else {
     pendingFilePath = filePath;
@@ -728,6 +936,7 @@ if (!gotLock) {
         const dirPath = stat.isDirectory() ? target : path.dirname(target);
         addAllowedRoot(dirPath);
         startWatching(dirPath);
+        setTimeout(() => { rebuildLinkIndex(); notifyLinkGraphChanged(new Set(["*"])); }, 0);
         if (stat.isDirectory()) {
           mainWindow.webContents.send("open-directory", target);
         } else {
@@ -783,6 +992,7 @@ app.whenReady().then(() => {
       const dirPath = stat.isDirectory() ? initialPath : path.dirname(initialPath);
       addAllowedRoot(dirPath);
       startWatching(dirPath);
+      setTimeout(() => { rebuildLinkIndex(); notifyLinkGraphChanged(new Set(["*"])); }, 0);
     } catch {
       // ignore
     }
@@ -804,4 +1014,5 @@ app.on("window-all-closed", () => {
 
 app.on("will-quit", () => {
   stopAllWatchers();
+  flushFoldState();
 });

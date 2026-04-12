@@ -32,6 +32,9 @@
 - **CLI launch** — Open from the terminal pointing at any directory
 - **Cross-platform** — macOS, Windows, and Linux
 - **Accessible** — ARIA labels, semantic landmarks, keyboard-navigable
+- **Collapsible document view** — Opt-in mode showing headings as an always-visible expandable tree. Expand sections to read, collapse to scan. Fold state persists across sessions. Keyboard: j/k navigate, Enter expand, [ ] collapse/expand all
+- **Link intelligence** — Tracks inter-document links (standard markdown + wiki-links). See outgoing/incoming links in the right panel, detect broken and stale links, filter the file tree to connected documents only
+- **Document outline** — Right-side panel with Contents (heading outline) and Links (backlinks) views via segmented control. Active heading tracked via scroll position. Font scales with A+/A-
 
 ## Download
 

@@ -8,6 +8,10 @@ import "katex/dist/katex.min.css";
 import { useAppStore } from "../store";
 import { analyzeText, computeReadability, type StyleIssue } from "../utils/styleCheck";
 import { resolveLocalImageSrc } from "../utils/resolveLocalImageSrc";
+import { SANITIZE_CONFIG } from "../utils/sanitizeConfig";
+import { buildSectionModel, type SectionModel } from "../utils/sectionModel";
+import { CollapsiblePreview } from "./CollapsiblePreview";
+import { WIKI_LINK_PATTERN } from "../../shared/linkPatterns";
 
 // Register only the most common languages to keep bundle small
 import javascript from "highlight.js/lib/languages/javascript";
@@ -96,7 +100,14 @@ function slugify(text: string): string {
     .replace(/^-|-$/g, "");        // trim leading/trailing hyphens
 }
 
-renderer.heading = function ({ text, depth }: { text: string; depth: number }) {
+renderer.heading = function (token: any) {
+  const { text, depth } = token;
+  // Use canonical ID from section model token annotation if available
+  const canonicalId = token._canonicalId;
+  if (canonicalId) {
+    return `<h${depth} id="${canonicalId}">${text}</h${depth}>\n`;
+  }
+  // Fallback: compute ID from slug (used when section model is not built)
   const base = slugify(text);
   const count = headingSlugCounts[base] || 0;
   headingSlugCounts[base] = count + 1;
@@ -133,7 +144,7 @@ const wikiLinkExtension = {
   level: "inline" as const,
   start(src: string) { return src.indexOf("[["); },
   tokenizer(src: string) {
-    const match = /^\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/.exec(src);
+    const match = WIKI_LINK_PATTERN.exec(src);
     if (match) {
       return {
         type: "wikiLink",
@@ -214,19 +225,13 @@ function rewriteHtmlImageSrcs(html: string, fileDir: string): string {
   );
 }
 
-function renderMarkdown(content: string, filePath: string): string {
+function renderMarkdownFromModel(model: SectionModel, filePath: string): string {
   // Set current directory for image resolution during this parse
   currentFileDir = filePath.replace(/[/\\][^/\\]+$/, "");
-  // Reset heading slug counter for each render pass
   headingSlugCounts = {};
-  const raw = marked.parse(content) as string;
-  const sanitized = DOMPurify.sanitize(raw, {
-    ADD_TAGS: ["input", "annotation", "semantics", "math", "mrow", "mi", "mo", "mn", "msup", "msub", "mfrac", "mtext", "mspace", "mover", "munder"],
-    ADD_ATTR: ["checked", "disabled", "type", "data-mermaid", "data-wiki-target", "aria-hidden", "style", "xmlns", "encoding"],
-    ADD_URI_SAFE_ATTR: ["src"],
-    ALLOWED_URI_REGEXP: /^(?:(?:https?|local-img|data|mailto):|[^a-z]|[a-z+.-]+(?:[^a-z+.\-:]|$))/i,
-  });
-  // Rewrite any remaining relative <img src="..."> from raw HTML in the markdown
+  // Use annotated tokens (with _canonicalId stamped on headings) for rendering
+  const raw = marked.parser(model.annotatedTokens);
+  const sanitized = DOMPurify.sanitize(raw, SANITIZE_CONFIG);
   return rewriteHtmlImageSrcs(sanitized, currentFileDir);
 }
 
@@ -265,12 +270,18 @@ export function MarkdownPreview() {
   const setEditContent = useAppStore((s) => s.setEditContent);
   const styleCheckEnabled = useAppStore((s) => s.styleCheckEnabled);
   const toggleStyleCheck = useAppStore((s) => s.toggleStyleCheck);
+  const previewMode = useAppStore((s) => s.previewMode);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [copyFeedback, setCopyFeedback] = useState(false);
   const [scrollProgress, setScrollProgress] = useState(0);
 
-  // Save scroll position of the previous tab before switching
+  // Save scroll position of the previous tab before switching.
+  // TODO(Issue 8): In collapsible mode, saved scroll positions are unreliable
+  // because fold state changes document height. Scroll restoration still works
+  // reasonably because fold state is persisted separately and restored before
+  // the scroll position is applied. A more robust approach would save the
+  // nearest visible heading ID and scroll to it after fold state is restored.
   const prevFileRef = useRef<string | null>(null);
 
   // Load file content on selection change, with dirty guard
@@ -280,6 +291,7 @@ export function MarkdownPreview() {
       useAppStore.getState().setTabScrollPosition(prevFileRef.current, scrollRef.current.scrollTop);
     }
     prevFileRef.current = selectedFile;
+    lastRenderedHtmlRef.current = ""; // Clear stale export cache on file switch
 
     if (!selectedFile) return;
 
@@ -357,23 +369,50 @@ export function MarkdownPreview() {
     // Initialize from current scroll position (e.g. returning from edit mode)
     updateProgress();
     el.addEventListener("scroll", updateProgress, { passive: true });
-    // Observe the content child for reflows from width/height/font changes
-    const content = el.querySelector(".preview-content");
+    // Observe content and collapsible wrapper for reflows on expand/collapse
     const observer = new ResizeObserver(updateProgress);
-    if (content) observer.observe(content);
+    el.querySelectorAll(".preview-content, .collapsible-preview").forEach((c) => observer.observe(c));
     observer.observe(el);
     return () => {
       el.removeEventListener("scroll", updateProgress);
       observer.disconnect();
     };
-  }, [selectedFile, editMode]);
+  }, [selectedFile, editMode, previewMode]);
 
   // Render draft content when dirty, otherwise saved content
   const previewSource = editDirty ? editContent : markdownContent;
-  const html = useMemo(() => {
-    if (!previewSource || !selectedFile) return "";
-    return renderMarkdown(previewSource, selectedFile);
+  // Build section model from markdown content (shared by CollapsiblePreview and DocumentOutline)
+  const sectionModel = useMemo<SectionModel | null>(() => {
+    if (!previewSource || !selectedFile) return null;
+    return buildSectionModel(previewSource, selectedFile);
   }, [previewSource, selectedFile]);
+
+  // Push section model to store so DocumentOutline can consume it
+  useEffect(() => {
+    useAppStore.getState().setSectionModel(sectionModel);
+  }, [sectionModel]);
+
+  // Render HTML using annotated tokens (with canonical heading IDs).
+  // Skip the expensive render when in edit mode — preview is hidden.
+  // sectionModel still rebuilds (DocumentOutline and fold-state transfer consume it).
+  // Export handlers use lastRenderedHtml (ref) so exports work even in edit mode.
+  const lastRenderedHtmlRef = useRef("");
+  const html = useMemo(() => {
+    if (!sectionModel || !selectedFile) return "";
+    if (editMode) return "";
+    const rendered = renderMarkdownFromModel(sectionModel, selectedFile);
+    lastRenderedHtmlRef.current = rendered;
+    return rendered;
+  }, [sectionModel, selectedFile, editMode]);
+
+  // In collapsible mode, strip heading IDs from the hidden standard content
+  // to avoid duplicate IDs in the DOM (collapsible sections have their own IDs)
+  const viewHtml = useMemo(() => {
+    if (previewMode === "collapsible" && html) {
+      return html.replace(/<(h[1-6])\s+id="[^"]*"/g, "<$1");
+    }
+    return html;
+  }, [html, previewMode]);
 
   // Style check: analyse text and compute readability when enabled
   const styleIssues = useMemo<StyleIssue[]>(() => {
@@ -390,11 +429,11 @@ export function MarkdownPreview() {
   // We walk text nodes in the preview DOM after render and wrap matched
   // ranges with <mark> elements.  This avoids mutating the markdown source.
   useEffect(() => {
-    const container = scrollRef.current?.querySelector(".preview-content");
-    // Cleanup function: unwrap any existing style marks
+    const scrollContainer = scrollRef.current;
+    // Cleanup function: unwrap any existing style marks in all preview-content containers
     const removeMarks = () => {
-      if (!container) return;
-      const marks = container.querySelectorAll("mark.style-issue");
+      if (!scrollContainer) return;
+      const marks = scrollContainer.querySelectorAll("mark.style-issue");
       marks.forEach((mark) => {
         const parent = mark.parentNode;
         if (parent) {
@@ -407,7 +446,10 @@ export function MarkdownPreview() {
       removeMarks();
       return removeMarks;
     }
-    if (!container) return;
+    if (!scrollContainer) return;
+    // Get all preview-content containers (standard + collapsible sections)
+    const containers = scrollContainer.querySelectorAll<HTMLElement>(".preview-content");
+    if (containers.length === 0) return;
 
     // Build a set of issue texts grouped by type for quick lookup.
     // We match on the rendered text content, not markdown positions.
@@ -436,7 +478,8 @@ export function MarkdownPreview() {
       }
     }
 
-    // Walk text nodes and wrap matches
+    // Walk text nodes and wrap matches in all preview-content containers
+    for (const container of containers) {
     const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, {
       acceptNode: (node) => {
         // Skip nodes inside <code>, <pre>, <script>, <style>, and existing marks
@@ -499,34 +542,131 @@ export function MarkdownPreview() {
         }
       }
     }
-    return removeMarks;
+    } // end containers loop
+
+    // Watch for new .preview-content nodes added by collapsible section expansion
+    // so style highlights are applied to lazily-rendered content.
+    const observer = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        for (const node of mutation.addedNodes) {
+          if (!(node instanceof Element)) continue;
+          const targets = node.matches(".preview-content")
+            ? [node as HTMLElement]
+            : Array.from(node.querySelectorAll<HTMLElement>(".preview-content"));
+          for (const container of targets) {
+            const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, {
+              acceptNode: (n) => {
+                const parent = n.parentElement;
+                if (!parent) return NodeFilter.FILTER_REJECT;
+                const tag = parent.tagName;
+                if (tag === "CODE" || tag === "PRE" || tag === "SCRIPT" || tag === "STYLE" || tag === "MARK") {
+                  return NodeFilter.FILTER_REJECT;
+                }
+                return NodeFilter.FILTER_ACCEPT;
+              },
+            });
+            const textNodes: Text[] = [];
+            let tn: Node | null;
+            while ((tn = walker.nextNode())) textNodes.push(tn as Text);
+
+            for (const textNode of textNodes) {
+              const text = textNode.textContent || "";
+              combinedPattern.lastIndex = 0;
+              const fragments: (string | HTMLElement)[] = [];
+              let last = 0;
+              let mr: RegExpExecArray | null;
+              while ((mr = combinedPattern.exec(text)) !== null) {
+                const matched = mr[0];
+                const info = issueLookup.get(matched.toLowerCase());
+                if (!info) continue;
+                if (mr.index > last) fragments.push(text.slice(last, mr.index));
+                const mark = document.createElement("mark");
+                mark.className = `style-issue style-${info.type}`;
+                mark.textContent = matched;
+                if (info.suggestion) {
+                  mark.setAttribute("data-tooltip", info.suggestion);
+                  mark.title = info.suggestion;
+                }
+                fragments.push(mark);
+                last = mr.index + matched.length;
+              }
+              if (fragments.length > 0) {
+                if (last < text.length) fragments.push(text.slice(last));
+                const parent = textNode.parentNode;
+                if (parent) {
+                  const frag = document.createDocumentFragment();
+                  for (const f of fragments) {
+                    frag.appendChild(typeof f === "string" ? document.createTextNode(f) : f);
+                  }
+                  parent.replaceChild(frag, textNode);
+                }
+              }
+            }
+          }
+        }
+      }
+    });
+    if (scrollContainer) {
+      observer.observe(scrollContainer, { childList: true, subtree: true });
+    }
+
+    return () => {
+      removeMarks();
+      observer.disconnect();
+    };
   }, [html, styleCheckEnabled, editMode, styleIssues]);
 
-  // Render Mermaid diagrams after DOM update
+  // Render Mermaid diagrams after DOM update.
+  // Uses MutationObserver to also catch blocks added by collapsible section expansion.
   useEffect(() => {
-    if (editMode || !html) return;
+    if (editMode) return;
     const container = scrollRef.current;
     if (!container) return;
-    const blocks = container.querySelectorAll<HTMLElement>(".mermaid-block[data-mermaid]");
-    if (blocks.length === 0) return;
 
     let cancelled = false;
-    import("mermaid").then(({ default: mermaid }) => {
-      if (cancelled) return;
-      mermaid.initialize({ startOnLoad: false, theme: "default", securityLevel: "strict" });
+    let mermaidModule: any = null;
+
+    const processMermaidBlocks = (root: Element | Document = container) => {
+      const blocks = root.querySelectorAll<HTMLElement>(".mermaid-block[data-mermaid]");
+      if (blocks.length === 0 || !mermaidModule) return;
       blocks.forEach(async (block, i) => {
-        if (cancelled) return;
+        if (cancelled || block.dataset.mermaidRendered) return;
+        block.dataset.mermaidRendered = "true";
         const source = decodeURIComponent(block.dataset.mermaid || "");
         try {
-          const { svg } = await mermaid.render(`mermaid-${i}-${Date.now()}`, source);
+          const { svg } = await mermaidModule.render(`mermaid-${i}-${Date.now()}`, source);
           if (!cancelled) block.innerHTML = svg;
         } catch {
           // Leave the raw text visible on parse error
         }
       });
+    };
+
+    import("mermaid").then(({ default: mermaid }) => {
+      if (cancelled) return;
+      mermaidModule = mermaid;
+      mermaid.initialize({ startOnLoad: false, theme: "default", securityLevel: "strict" });
+      processMermaidBlocks();
     });
-    return () => { cancelled = true; };
-  }, [html, editMode]);
+
+    // Watch for new mermaid blocks added by collapsible section expansion
+    const observer = new MutationObserver((mutations) => {
+      if (!mermaidModule) return;
+      for (const mutation of mutations) {
+        for (const node of mutation.addedNodes) {
+          if (node instanceof Element) {
+            processMermaidBlocks(node);
+          }
+        }
+      }
+    });
+    observer.observe(container, { childList: true, subtree: true });
+
+    return () => {
+      cancelled = true;
+      observer.disconnect();
+    };
+  }, [html, editMode, previewMode]);
 
   // Word count and reading time
   const { wordCount, readingTime } = useMemo(() => {
@@ -607,21 +747,27 @@ export function MarkdownPreview() {
     for (const project of state.projects) {
       const found = findInTree(project.tree);
       if (found) {
+        // Use openTab + selectFile only — the useEffect in this component
+        // handles file reading and the dirty-draft save/discard guard.
+        state.openTab(found);
         state.selectFile(found);
-        window.api.readFile(found).then((content) => {
-          useAppStore.getState().setMarkdownContent(content);
-        });
         return;
       }
     }
   }, []);
 
   const handleExportHTML = useCallback(async () => {
-    if (!html) return;
+    // In edit mode, always render from editContent on demand (whether dirty or just saved).
+    // editMode stays true after save, so we can't rely on editDirty alone.
+    // Use editContent even when empty (intentional blank draft).
+    const exportHtml = html || (editMode && selectedFile
+      ? renderMarkdownFromModel(buildSectionModel(editContent || "", selectedFile), selectedFile)
+      : lastRenderedHtmlRef.current);
+    if (!exportHtml) return;
     // Rewrite local-img:// protocol URLs back to file:// for portability
     // Keep paths URL-encoded so embedLocalImages can parse them correctly
     // (decoding here would break filenames containing # or ?)
-    const portableHtml = html.replace(/local-img:\/\//g, "file://");
+    const portableHtml = exportHtml.replace(/local-img:\/\//g, "file://");
     // Gather computed styles for the preview
     const styleSheets = Array.from(document.styleSheets);
     let css = "";
@@ -642,17 +788,23 @@ export function MarkdownPreview() {
     const rootInlineStyle = root.style.cssText;
     const warmFilter = root.classList.contains("warm-filter");
     await window.api.exportHTML(portableHtml, css, theme, font, rootInlineStyle, warmFilter);
-  }, [html]);
+  }, [html, editMode, editContent, selectedFile, sectionModel]);
 
   const handleExportPDF = useCallback(async () => {
     await window.api.exportPDF();
   }, []);
 
   const handleExportDOCX = useCallback(async () => {
-    if (!html) return;
+    // In edit mode, always render from editContent on demand (whether dirty or just saved).
+    // editMode stays true after save, so we can't rely on editDirty alone.
+    // Use editContent even when empty (intentional blank draft).
+    const exportHtml = html || (editMode && selectedFile
+      ? renderMarkdownFromModel(buildSectionModel(editContent || "", selectedFile), selectedFile)
+      : lastRenderedHtmlRef.current);
+    if (!exportHtml) return;
     // Keep paths URL-encoded so embedLocalImages can parse them correctly
     // (decoding here would break filenames containing # or ?)
-    const portableHtml = html.replace(/local-img:\/\//g, "file://");
+    const portableHtml = exportHtml.replace(/local-img:\/\//g, "file://");
     const styleSheets = Array.from(document.styleSheets);
     let css = "";
     for (const sheet of styleSheets) {
@@ -670,7 +822,7 @@ export function MarkdownPreview() {
     const rootInlineStyle = root.style.cssText;
     const warmFilter = root.classList.contains("warm-filter");
     await window.api.exportDOCX(portableHtml, css, theme, font, rootInlineStyle, warmFilter);
-  }, [html]);
+  }, [html, editMode, editContent, selectedFile, sectionModel]);
 
   const handleSave = useCallback(async () => {
     if (!selectedFile || !editDirty) return;
@@ -805,10 +957,17 @@ export function MarkdownPreview() {
             spellCheck={false}
           />
         )}
+        {!editMode && previewMode === "collapsible" && sectionModel && (
+          <CollapsiblePreview
+            sectionModel={sectionModel}
+            selectedFile={selectedFile!}
+            onClick={handlePreviewClick}
+          />
+        )}
         <div
-          className="preview-content"
-          style={editMode ? { display: "none" } : undefined}
-          dangerouslySetInnerHTML={{ __html: html }}
+          className={`preview-content${previewMode === "collapsible" && sectionModel ? " preview-content-hidden" : ""}`}
+          style={editMode || (previewMode === "collapsible" && sectionModel) ? { display: "none" } : undefined}
+          dangerouslySetInnerHTML={{ __html:viewHtml }}
           onClick={handlePreviewClick}
         />
       </div>

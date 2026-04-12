@@ -101,6 +101,18 @@ function ContentWidthPopover() {
   );
 }
 
+function CollapseViewIcon() {
+  return (
+    <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+      {/* Stacked bars with chevrons representing collapsible sections */}
+      <polyline points="3,3 5,4.5 3,6" />
+      <line x1="7" y1="4.5" x2="14" y2="4.5" />
+      <polyline points="3,8 5,9.5 3,11" />
+      <line x1="7" y1="9.5" x2="14" y2="9.5" />
+    </svg>
+  );
+}
+
 function SettingsIcon() {
   return (
     <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -125,6 +137,9 @@ export function Toolbar() {
     toggleStyleCheck,
     styleCheckEnabled,
     selectedFile,
+    previewMode,
+    setPreviewMode,
+    editMode,
   } = useAppStore();
 
   const themeInfo = THEMES.find((t) => t.id === theme);
@@ -179,6 +194,17 @@ export function Toolbar() {
           >
             Prose
           </button>
+          {!editMode && (
+            <button
+              className={`toolbar-btn${previewMode === "collapsible" ? " active" : ""}`}
+              onClick={() => setPreviewMode(previewMode === "collapsible" ? "standard" : "collapsible")}
+              aria-label={`Collapsible view ${previewMode === "collapsible" ? "on" : "off"}`}
+              aria-pressed={previewMode === "collapsible"}
+              title="Toggle collapsible view"
+            >
+              <CollapseViewIcon />
+            </button>
+          )}
           <button
             className={`toolbar-btn${outlineVisible ? " active" : ""}`}
             onClick={toggleOutline}

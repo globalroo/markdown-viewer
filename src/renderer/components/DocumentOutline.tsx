@@ -1,5 +1,6 @@
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { useAppStore } from "../store";
+import { LinksPanel } from "./LinksPanel";
 
 interface HeadingEntry {
   id: string;
@@ -122,7 +123,6 @@ function OutlineResizeHandle() {
 }
 
 export function DocumentOutline() {
-  const [headings, setHeadings] = useState<HeadingEntry[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const observerRef = useRef<IntersectionObserver | null>(null);
   const collapseRef = useRef<HTMLButtonElement>(null);
@@ -132,38 +132,23 @@ export function DocumentOutline() {
   const pendingFocusRef = useRef<"rail" | "collapse" | null>(null);
   const outlineVisible = useAppStore((s) => s.outlineVisible);
   const toggleOutline = useAppStore((s) => s.toggleOutline);
-
-  // Extract headings from rendered content whenever it changes
-  const selectedFile = useAppStore((s) => s.selectedFile);
-  const markdownContent = useAppStore((s) => s.markdownContent);
-  const editDirty = useAppStore((s) => s.editDirty);
-  const editContent = useAppStore((s) => s.editContent);
   const editMode = useAppStore((s) => s.editMode);
+  const previewMode = useAppStore((s) => s.previewMode);
+  const rightPanelView = useAppStore((s) => s.rightPanelView);
+  const setRightPanelView = useAppStore((s) => s.setRightPanelView);
+  const selectedFile = useAppStore((s) => s.selectedFile);
+  const linkGraph = useAppStore((s) => s.linkGraph);
 
-  const extractHeadings = useCallback(() => {
-    const container = document.querySelector(".preview-content");
-    if (!container) {
-      setHeadings([]);
-      return;
-    }
-    const els = container.querySelectorAll("h1, h2, h3, h4, h5, h6");
-    const entries: HeadingEntry[] = [];
-    els.forEach((el) => {
-      const id = el.id;
-      if (!id) return;
-      const level = parseInt(el.tagName[1], 10);
-      const text = el.textContent || "";
-      entries.push({ id, text, level });
-    });
-    setHeadings(entries);
-  }, []);
-
-  // Re-extract headings when content changes
-  useEffect(() => {
-    // Small delay to let the DOM update after React render
-    const timer = setTimeout(extractHeadings, 50);
-    return () => clearTimeout(timer);
-  }, [selectedFile, markdownContent, editDirty, editContent, extractHeadings]);
+  // Derive headings from the shared section model (replaces DOM scraping)
+  const sectionModel = useAppStore((s) => s.sectionModel);
+  const headings = useMemo<HeadingEntry[]>(() => {
+    if (!sectionModel) return [];
+    return sectionModel.flatHeadings.map((h) => ({
+      id: h.id,
+      text: h.text,
+      level: h.level,
+    }));
+  }, [sectionModel]);
 
   // IntersectionObserver for active heading tracking
   useEffect(() => {
@@ -206,18 +191,16 @@ export function DocumentOutline() {
       }
     );
 
-    const container = document.querySelector(".preview-content");
-    if (!container) return;
-
-    const els = container.querySelectorAll("h1, h2, h3, h4, h5, h6");
-    els.forEach((el) => {
-      if (el.id) observerRef.current!.observe(el);
+    // Observe headings by ID — works for both standard (h1-h6) and collapsible (span[role=heading])
+    headings.forEach((h) => {
+      const el = document.getElementById(h.id);
+      if (el) observerRef.current!.observe(el);
     });
 
     return () => {
       observerRef.current?.disconnect();
     };
-  }, [headings, outlineVisible, editMode]);
+  }, [headings, outlineVisible, editMode, previewMode]);
 
   // Focus management: move focus between collapse chevron and rail on toggle.
   // Uses a pending-focus mechanism for when the target isn't mounted yet
@@ -276,12 +259,17 @@ export function DocumentOutline() {
     setActiveId(id);
   }, []);
 
-  // No headings or in edit mode — show nothing
-  if (headings.length === 0 || editMode) {
+  // Determine if we have anything to show in either view
+  const hasHeadings = headings.length > 0;
+  const hasLinks = linkGraph && selectedFile && (linkGraph.outgoing?.length > 0 || linkGraph.incoming?.length > 0);
+  const hasContent = hasHeadings || hasLinks;
+
+  // Nothing to show in either view — hide completely
+  if (!hasContent || editMode) {
     return null;
   }
 
-  // Outline hidden but headings exist — show the rail
+  // Panel hidden — show the rail
   if (!outlineVisible) {
     return (
       <button
@@ -303,7 +291,22 @@ export function DocumentOutline() {
     <nav className="document-outline" aria-label="Document outline">
       <OutlineResizeHandle />
       <div className="outline-header">
-        <span>Contents</span>
+        <div className="outline-segmented-control">
+          <button
+            className={`outline-segment${rightPanelView === "outline" ? " active" : ""}`}
+            onClick={() => setRightPanelView("outline")}
+            aria-pressed={rightPanelView === "outline"}
+          >
+            Contents
+          </button>
+          <button
+            className={`outline-segment${rightPanelView === "links" ? " active" : ""}`}
+            onClick={() => setRightPanelView("links")}
+            aria-pressed={rightPanelView === "links"}
+          >
+            Links
+          </button>
+        </div>
         <button
           ref={collapseRef}
           className="outline-collapse-btn"
@@ -314,19 +317,27 @@ export function DocumentOutline() {
           <CollapseIcon />
         </button>
       </div>
-      <div className="outline-list">
-        {headings.map((h, i) => (
-          <button
-            key={`${h.id}-${i}`}
-            className={`outline-item ${activeId === h.id ? "active" : ""}`}
-            style={{ paddingLeft: `${8 + (h.level - minLevel) * 12}px` }}
-            onClick={() => handleClick(h.id)}
-            title={h.text}
-          >
-            <span className="outline-item-text">{h.text}</span>
-          </button>
-        ))}
-      </div>
+      {rightPanelView === "links" ? (
+        <LinksPanel />
+      ) : (
+        <div className="outline-list">
+          {headings.length > 0 ? (
+            headings.map((h, i) => (
+              <button
+                key={`${h.id}-${i}`}
+                className={`outline-item ${activeId === h.id ? "active" : ""}`}
+                style={{ paddingLeft: `${0.6 + (h.level - minLevel) * 0.9}em` }}
+                onClick={() => handleClick(h.id)}
+                title={h.text}
+              >
+                <span className="outline-item-text">{h.text}</span>
+              </button>
+            ))
+          ) : (
+            <div className="outline-empty">No headings</div>
+          )}
+        </div>
+      )}
     </nav>
   );
 }

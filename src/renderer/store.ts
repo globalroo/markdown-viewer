@@ -127,6 +127,17 @@ interface AppState {
   // Style check
   styleCheckEnabled: boolean;
 
+  // Section model (shared by CollapsiblePreview and DocumentOutline)
+  sectionModel: import("./utils/sectionModel").SectionModel | null;
+
+  // Preview mode
+  previewMode: "standard" | "collapsible";
+
+  // Link intelligence
+  linkGraph: any | null;
+  linksFilterActive: boolean;
+  linksFilterHops: 1 | 2;
+
   addProject: (rootPath: string, tree: TreeNode[]) => void;
   removeProject: (id: string) => void;
   toggleProject: (id: string) => void;
@@ -179,6 +190,21 @@ interface AppState {
   // Style check actions
   toggleStyleCheck: () => void;
 
+  // Section model actions
+  setSectionModel: (model: import("./utils/sectionModel").SectionModel | null) => void;
+
+  // Preview mode actions
+  setPreviewMode: (mode: "standard" | "collapsible") => void;
+
+  // Right panel
+  rightPanelView: "outline" | "links";
+  setRightPanelView: (view: "outline" | "links") => void;
+
+  // Link intelligence actions
+  setLinkGraph: (graph: any | null) => void;
+  toggleLinksFilter: () => void;
+  setLinksFilterHops: (hops: 1 | 2) => void;
+
   // Tree mutation after rename/move
   updateProjectTree: (projectId: string, tree: TreeNode[], oldPath?: string, newPath?: string) => void;
 }
@@ -212,6 +238,12 @@ export const useAppStore = create<AppState>((set) => ({
   openTabs: [],
   activeTab: null,
   styleCheckEnabled: false,
+  sectionModel: null,
+  previewMode: "standard",
+  rightPanelView: "outline",
+  linkGraph: null,
+  linksFilterActive: false,
+  linksFilterHops: 1,
 
   addProject: (rootPath, tree) =>
     set((state) => {
@@ -430,6 +462,15 @@ export const useAppStore = create<AppState>((set) => ({
 
   toggleStyleCheck: () =>
     set((state) => ({ styleCheckEnabled: !state.styleCheckEnabled })),
+
+  setSectionModel: (model) => set({ sectionModel: model }),
+
+  setPreviewMode: (mode) => set({ previewMode: mode }),
+
+  setRightPanelView: (view) => set({ rightPanelView: view }),
+  setLinkGraph: (graph) => set({ linkGraph: graph }),
+  toggleLinksFilter: () => set((state) => ({ linksFilterActive: !state.linksFilterActive })),
+  setLinksFilterHops: (hops) => set({ linksFilterHops: hops }),
 
   updateProjectTree: (projectId, tree, oldPath, newPath) =>
     set((state) => {

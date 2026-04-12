@@ -11,7 +11,7 @@ const SIDEBAR_SIZE_OPTIONS = [
 
 const DRAG_MIME = "application/x-viewmd-path";
 
-function ProjectSection({ project }: { project: { id: string; rootPath: string; name: string; tree: TreeNode[]; isExpanded: boolean } }) {
+function ProjectSection({ project, connectedPaths }: { project: { id: string; rootPath: string; name: string; tree: TreeNode[]; isExpanded: boolean }; connectedPaths?: Set<string> }) {
   const { toggleProject, removeProject, searchQuery } = useAppStore();
   const [isDragOver, setIsDragOver] = useState(false);
 
@@ -96,7 +96,7 @@ function ProjectSection({ project }: { project: { id: string; rootPath: string; 
       </div>
       {project.isExpanded && (
         <div className="project-tree">
-          <FileTree tree={project.tree} searchQuery={searchQuery} projectRootPath={project.rootPath} />
+          <FileTree tree={project.tree} searchQuery={searchQuery} projectRootPath={project.rootPath} connectedPaths={connectedPaths} />
         </div>
       )}
     </div>
@@ -272,24 +272,18 @@ function ContentSearchResults({
 }) {
   const { selectFile } = useAppStore();
 
+  // TODO(Issue 9): When clicking a content search result in collapsible mode,
+  // the matched content may be inside a collapsed section. This requires
+  // cross-component communication to expand the relevant section. For now,
+  // users can use Cmd+F which already expands all sections for native find.
   const handleClick = useCallback(
     (result: SearchResult) => {
-      selectFile(result.filePath);
-      // Read and display the file, then attempt to scroll to the matching line
-      window.api.readFile(result.filePath).then((content) => {
-        useAppStore.getState().setMarkdownContent(content);
-        // Scroll to approximate position based on line number
-        requestAnimationFrame(() => {
-          const scrollEl = document.querySelector(".preview-scroll");
-          if (!scrollEl) return;
-          const contentEl = scrollEl.querySelector(".preview-content");
-          if (!contentEl) return;
-          const totalLines = content.split("\n").length;
-          const ratio = Math.max(0, (result.line - 1) / totalLines);
-          const scrollTarget = ratio * scrollEl.scrollHeight;
-          scrollEl.scrollTo({ top: scrollTarget, behavior: "smooth" });
-        });
-      });
+      // Use openTab + selectFile only — MarkdownPreview's useEffect handles
+      // file reading and the dirty-draft save/discard guard.
+      const store = useAppStore.getState();
+      store.openTab(result.filePath);
+      store.selectFile(result.filePath);
+      // TODO: scroll to approximate line position after content loads
     },
     [selectFile]
   );
@@ -351,12 +345,39 @@ function ContentSearchResults({
 }
 
 export function Sidebar() {
-  const { projects, searchQuery, setSearchQuery, sidebarVisible } = useAppStore();
+  const { projects, searchQuery, setSearchQuery, sidebarVisible, linksFilterActive, toggleLinksFilter, linksFilterHops, setLinksFilterHops, selectedFile, linkGraph } = useAppStore();
   const [contentSearchMode, setContentSearchMode] = useState(false);
   const [contentResults, setContentResults] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastQueryRef = useRef("");
+
+  // Connected files filter: fetch connected paths when filter is active
+  const [connectedPaths, setConnectedPaths] = useState<Set<string> | undefined>(undefined);
+  useEffect(() => {
+    if (!linksFilterActive || !selectedFile) {
+      setConnectedPaths(undefined);
+      return;
+    }
+    let cancelled = false;
+    window.api.getConnectedPaths(selectedFile, linksFilterHops).then((paths) => {
+      if (cancelled) return;
+      const pathSet = new Set(paths);
+      setConnectedPaths(pathSet);
+      // Auto-expand ancestor directories so filtered files are visible
+      const store = useAppStore.getState();
+      const dirsToExpand = new Set<string>();
+      for (const p of paths) {
+        let dir = p.substring(0, p.lastIndexOf("/"));
+        while (dir && !store.expandedDirs.has(dir)) {
+          dirsToExpand.add(dir);
+          dir = dir.substring(0, dir.lastIndexOf("/"));
+        }
+      }
+      for (const d of dirsToExpand) store.toggleDir(d);
+    });
+    return () => { cancelled = true; };
+  }, [linksFilterActive, selectedFile, linksFilterHops, linkGraph]);
 
   const handleAddFolder = useCallback(async () => {
     const result = await window.api.openFolder();
@@ -499,6 +520,30 @@ export function Sidebar() {
         </div>
       )}
 
+      {linksFilterActive && selectedFile && (
+        <div className="links-filter-pill">
+          <span>Linked files ({linksFilterHops === 1 ? "1-hop" : "2-hop"})</span>
+          <select
+            className="links-filter-hops"
+            value={linksFilterHops}
+            onChange={(e) => setLinksFilterHops(Number(e.target.value) as 1 | 2)}
+          >
+            <option value={1}>1-hop</option>
+            <option value={2}>2-hop</option>
+          </select>
+          <button
+            className="links-filter-clear"
+            onClick={toggleLinksFilter}
+            aria-label="Clear link filter"
+          >
+            <svg aria-hidden="true" width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+              <line x1="1" y1="1" x2="9" y2="9" />
+              <line x1="9" y1="1" x2="1" y2="9" />
+            </svg>
+          </button>
+        </div>
+      )}
+
       <div className="sidebar-content">
         {contentSearchMode ? (
           <ContentSearchResults
@@ -509,7 +554,7 @@ export function Sidebar() {
         ) : (
           <>
             {projects.map((project) => (
-              <ProjectSection key={project.id} project={project} />
+              <ProjectSection key={project.id} project={project} connectedPaths={connectedPaths} />
             ))}
 
             {projects.length === 0 && (

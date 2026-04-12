@@ -109,6 +109,9 @@ function useKeyboardShortcuts() {
           if (e.shiftKey) {
             e.preventDefault();
             state.toggleFocusMode();
+          } else if (state.previewMode === "collapsible") {
+            // In collapsible mode, let native browser find work by not intercepting
+            // The CollapsiblePreview component handles expanding sections for search
           } else {
             e.preventDefault();
             const searchInput =
@@ -295,6 +298,16 @@ function useFileAssociation() {
       }
     });
 
+    // Link graph: listen for changes and refresh if current file is affected
+    const unsubLinkGraph = window.api.onLinkGraphChanged((affectedPaths) => {
+      const state = useAppStore.getState();
+      if (state.selectedFile && (affectedPaths.includes("*") || affectedPaths.includes(state.selectedFile))) {
+        window.api.getLinkGraph(state.selectedFile).then((graph) => {
+          useAppStore.getState().setLinkGraph(graph);
+        });
+      }
+    });
+
     // File watching: auto-refresh tree when files are added/removed/renamed
     const unsubTreeChanged = window.api.onTreeChanged((rootPath, tree) => {
       const state = useAppStore.getState();
@@ -336,8 +349,26 @@ function useFileAssociation() {
       unsubDir();
       unsubFileChanged();
       unsubTreeChanged();
+      unsubLinkGraph();
     };
   }, []);
+}
+
+/** Fetch link graph whenever the selected file changes */
+function useLinkGraph() {
+  const selectedFile = useAppStore((s) => s.selectedFile);
+  useEffect(() => {
+    if (!selectedFile) {
+      useAppStore.getState().setLinkGraph(null);
+      return;
+    }
+    window.api.getLinkGraph(selectedFile).then((graph) => {
+      // Verify file hasn't changed while we were loading
+      if (useAppStore.getState().selectedFile === selectedFile) {
+        useAppStore.getState().setLinkGraph(graph);
+      }
+    });
+  }, [selectedFile]);
 }
 
 export function App() {
@@ -347,6 +378,7 @@ export function App() {
   useSidebarLayout();
   useCustomCSS();
   useFileAssociation();
+  useLinkGraph();
 
   const focusMode = useAppStore((s) => s.focusMode);
 
