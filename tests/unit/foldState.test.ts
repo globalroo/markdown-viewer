@@ -127,4 +127,60 @@ describe("Fold State Persistence", () => {
     expect(entries["/file309.md"]).toBeDefined();
     expect(entries["/file10.md"]).toBeDefined();
   });
+
+  it("flush retry: dirty flag stays set and timer re-arms on write failure", () => {
+    // Simulate the flush-retry pattern from main.ts:
+    // When atomicWriteJson throws, foldStateDirty stays true and
+    // scheduleFoldStateWrite is called again to re-arm the timer.
+
+    let foldStateDirty = true;
+    let foldStateTimer: ReturnType<typeof setTimeout> | null = null;
+    let scheduleCalls = 0;
+    const foldStateCache = {
+      entries: { "/file.md": { headingIds: { h1: true }, lastAccessed: Date.now() } },
+    };
+
+    function scheduleFoldStateWrite(): void {
+      if (foldStateTimer) return;
+      scheduleCalls++;
+      foldStateTimer = setTimeout(() => {
+        foldStateTimer = null;
+        flushFoldState();
+      }, 100);
+    }
+
+    function flushFoldState(): void {
+      if (!foldStateDirty || !foldStateCache) return;
+      try {
+        // Simulate write to a read-only / non-existent deep path
+        const badPath = path.join(tmpDir, "no-exist-parent", "deep", "fold-state.json");
+        const tmp = badPath + ".tmp";
+        // mkdirSync not called — this WILL throw
+        fs.writeFileSync(tmp, JSON.stringify(foldStateCache, null, 2), "utf-8");
+        fs.renameSync(tmp, badPath);
+        foldStateDirty = false;
+      } catch {
+        // Mirrors the catch block in main.ts: keep dirty=true, re-arm timer
+        scheduleFoldStateWrite();
+      }
+    }
+
+    // Initial state: dirty, no timer
+    expect(foldStateDirty).toBe(true);
+
+    // Trigger flush — it should fail because parent dir doesn't exist
+    flushFoldState();
+
+    // dirty flag must remain true (write failed)
+    expect(foldStateDirty).toBe(true);
+
+    // scheduler must have been called (re-armed)
+    expect(scheduleCalls).toBe(1);
+
+    // Timer should be set
+    expect(foldStateTimer).not.toBeNull();
+
+    // Clean up timer
+    if (foldStateTimer) clearTimeout(foldStateTimer);
+  });
 });

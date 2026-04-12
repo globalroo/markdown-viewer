@@ -144,3 +144,83 @@ describe("extractLinksFromContent", () => {
     expect(results.length).toBe(1);
   });
 });
+
+describe("Generation token pattern (back-to-back async rebuild)", () => {
+  // This tests the pattern used in main.ts rebuildLinkIndex():
+  // When two async builds overlap, only the latest generation's result is kept.
+
+  it("only the latest generation wins when two async builds overlap", async () => {
+    let buildGen = 0;
+    let currentIndex: string | null = null;
+
+    // Simulate two overlapping async builds, mirroring rebuildLinkIndex()
+    async function simulateBuild(label: string, delayMs: number): Promise<string> {
+      // Simulate async work
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+      return label;
+    }
+
+    // First build starts (slow)
+    const gen1 = ++buildGen;
+    const build1 = simulateBuild("stale-build-1", 50).then((result) => {
+      if (gen1 === buildGen) {
+        currentIndex = result;
+      }
+    });
+
+    // Second build starts immediately after (fast) — bumps the gen counter
+    const gen2 = ++buildGen;
+    const build2 = simulateBuild("fresh-build-2", 10).then((result) => {
+      if (gen2 === buildGen) {
+        currentIndex = result;
+      }
+    });
+
+    // Wait for both to complete
+    await Promise.all([build1, build2]);
+
+    // Only the second (latest) build should have been accepted
+    expect(currentIndex).toBe("fresh-build-2");
+    expect(buildGen).toBe(2);
+  });
+
+  it("first build is discarded even if it finishes after second", async () => {
+    let buildGen = 0;
+    let currentIndex: string | null = "initial";
+
+    async function simulateBuild(label: string, delayMs: number): Promise<string> {
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+      return label;
+    }
+
+    // First build (very slow — finishes last)
+    const gen1 = ++buildGen;
+    const build1 = simulateBuild("slow-build", 80).then((result) => {
+      if (gen1 === buildGen) {
+        currentIndex = result;
+      }
+    });
+
+    // Second build (fast — finishes first)
+    const gen2 = ++buildGen;
+    const build2 = simulateBuild("fast-build", 5).then((result) => {
+      if (gen2 === buildGen) {
+        currentIndex = result;
+      }
+    });
+
+    // Third build (medium — the current latest)
+    const gen3 = ++buildGen;
+    const build3 = simulateBuild("latest-build", 20).then((result) => {
+      if (gen3 === buildGen) {
+        currentIndex = result;
+      }
+    });
+
+    await Promise.all([build1, build2, build3]);
+
+    // Only the third (latest gen) should be retained
+    expect(currentIndex).toBe("latest-build");
+    expect(buildGen).toBe(3);
+  });
+});
