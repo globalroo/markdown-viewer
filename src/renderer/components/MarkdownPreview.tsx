@@ -390,11 +390,14 @@ export function MarkdownPreview() {
     useAppStore.getState().setSectionModel(sectionModel);
   }, [sectionModel]);
 
-  // Render HTML using annotated tokens (with canonical heading IDs)
+  // Render HTML using annotated tokens (with canonical heading IDs).
+  // Skip the expensive render when in edit mode — preview is hidden and html unused.
+  // sectionModel still rebuilds (DocumentOutline and fold-state transfer consume it).
   const html = useMemo(() => {
     if (!sectionModel || !selectedFile) return "";
+    if (editMode) return "";
     return renderMarkdownFromModel(sectionModel, selectedFile);
-  }, [sectionModel, selectedFile]);
+  }, [sectionModel, selectedFile, editMode]);
 
   // In collapsible mode, strip heading IDs from the hidden standard content
   // to avoid duplicate IDs in the DOM (collapsible sections have their own IDs)

@@ -149,8 +149,11 @@ export function extractLinksFromContent(
     return results;
   }
 
+  // Track search offset to handle duplicate link text correctly
+  let searchOffset = 0;
+
   // Walk tokens recursively to find links and wiki-links
-  function walkTokens(tokenList: any[], lineOffset: number) {
+  function walkTokens(tokenList: any[]) {
     for (const token of tokenList) {
       if (token.type === "link") {
         const href: string = token.href || "";
@@ -169,7 +172,9 @@ export function extractLinksFromContent(
         // Filter out paths that escape allowed project roots
         if (allowedRoots && !isWithinRoots(resolved, allowedRoots)) continue;
 
-        const line = findLineNumber(content, token.raw, lineOffset);
+        const line = findLineNumber(content, token.raw, searchOffset);
+        const idx = content.indexOf(token.raw, searchOffset);
+        if (idx !== -1) searchOffset = idx + token.raw.length;
         results.push({
           target: resolved,
           context: { line, text: lines[line - 1] || "" },
@@ -178,7 +183,9 @@ export function extractLinksFromContent(
         const target = token.target as string;
         const resolved = resolveWikiLink(target, sourceDir, filenameLookup);
         if (resolved) {
-          const line = findLineNumber(content, token.raw, lineOffset);
+          const line = findLineNumber(content, token.raw, searchOffset);
+          const idx = content.indexOf(token.raw, searchOffset);
+          if (idx !== -1) searchOffset = idx + token.raw.length;
           results.push({
             target: path.normalize(resolved),
             context: { line, text: lines[line - 1] || "" },
@@ -187,21 +194,21 @@ export function extractLinksFromContent(
       }
 
       // Recurse into child tokens (paragraphs, list items, etc.)
-      if (token.tokens) walkTokens(token.tokens, lineOffset);
+      if (token.tokens) walkTokens(token.tokens);
       if (token.items) {
         for (const item of token.items) {
-          if (item.tokens) walkTokens(item.tokens, lineOffset);
+          if (item.tokens) walkTokens(item.tokens);
         }
       }
     }
   }
 
-  walkTokens(tokens, 0);
+  walkTokens(tokens);
   return results;
 }
 
-function findLineNumber(content: string, raw: string, _offset: number): number {
-  const idx = content.indexOf(raw);
+function findLineNumber(content: string, raw: string, startOffset: number): number {
+  const idx = content.indexOf(raw, startOffset);
   if (idx === -1) return 1;
   let line = 1;
   for (let i = 0; i < idx; i++) {
@@ -226,6 +233,7 @@ function buildFilenameLookup(allFiles: string[]): Map<string, string[]> {
 
 /**
  * Build the full link index from all markdown files in all roots.
+ * Synchronous variant — use buildLinkIndexAsync for large projects.
  */
 export function buildLinkIndex(
   rootPaths: string[],
@@ -248,6 +256,44 @@ export function buildLinkIndex(
       continue;
     }
     indexFileContent(state, file, content);
+  }
+
+  return state;
+}
+
+/**
+ * Build the link index asynchronously, yielding to the event loop between
+ * batches to prevent main-thread blocking on large projects.
+ */
+export async function buildLinkIndexAsync(
+  rootPaths: string[],
+  collectMarkdownFiles: (dir: string) => string[],
+  allowedRoots?: Set<string>,
+  batchSize = 50
+): Promise<LinkIndexState> {
+  const roots = allowedRoots || new Set(rootPaths);
+  const state = createLinkIndex(roots);
+  const allFiles: string[] = [];
+  for (const root of rootPaths) {
+    allFiles.push(...collectMarkdownFiles(root));
+  }
+  state.filenameLookup = buildFilenameLookup(allFiles);
+
+  for (let i = 0; i < allFiles.length; i += batchSize) {
+    const batch = allFiles.slice(i, i + batchSize);
+    for (const file of batch) {
+      let content: string;
+      try {
+        content = fs.readFileSync(file, "utf-8");
+      } catch {
+        continue;
+      }
+      indexFileContent(state, file, content);
+    }
+    // Yield to event loop between batches
+    if (i + batchSize < allFiles.length) {
+      await new Promise((resolve) => setImmediate(resolve));
+    }
   }
 
   return state;

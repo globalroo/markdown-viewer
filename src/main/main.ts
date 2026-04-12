@@ -14,6 +14,7 @@ import { embedLocalImages } from "./embedLocalImages";
 import {
   type LinkIndexState,
   buildLinkIndex,
+  buildLinkIndexAsync,
   updateLinkIndexForFile,
   removeFileFromIndex,
   getLinkGraph,
@@ -123,7 +124,10 @@ function rebuildLinkIndex(): void {
     linkIndex = null;
     return;
   }
-  linkIndex = buildLinkIndex(roots, collectMarkdownFiles, allowedRoots);
+  // Use async build to yield to event loop between batches, preventing UI freeze
+  buildLinkIndexAsync(roots, collectMarkdownFiles, allowedRoots).then((index) => {
+    linkIndex = index;
+  });
 }
 
 function notifyLinkGraphChanged(affectedPaths: Set<string>): void {
