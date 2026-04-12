@@ -2150,14 +2150,31 @@ body {
   grid-template-rows: 1fr;
 }
 
+/* Subtle background on the heading row when its section is expanded */
+.collapsible-heading-row[aria-expanded="true"] {
+  background: var(--bg-hover);
+}
+
 .collapsible-section-inner {
   overflow: hidden;
   min-height: 0;
 }
 
+/* Content prose: indented deeper than its heading, with visual containment.
+   Uses em units so spacing scales with font size. */
 .collapsible-section-content {
-  padding: 4px 24px 12px;
+  padding: 0.5em 1.5em 1em 2.25em;
+  margin-bottom: 0.5em;
+  border-left: 1px solid var(--border-color);
+  margin-left: 1.5em;
 }
+
+/* Match content indent to heading level */
+.collapsible-section-L2 > .collapsible-section-body .collapsible-section-content { margin-left: 2.4em; padding-left: 3.1em; }
+.collapsible-section-L3 > .collapsible-section-body .collapsible-section-content { margin-left: 3.25em; padding-left: 4em; }
+.collapsible-section-L4 > .collapsible-section-body .collapsible-section-content { margin-left: 4.1em; padding-left: 4.9em; }
+.collapsible-section-L5 > .collapsible-section-body .collapsible-section-content { margin-left: 5em; padding-left: 5.75em; }
+.collapsible-section-L6 > .collapsible-section-body .collapsible-section-content { margin-left: 5.9em; padding-left: 6.6em; }
 
 /* Skip animation for batch expand/collapse */
 .no-transition .collapsible-section-body {

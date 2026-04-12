@@ -102,7 +102,7 @@ function CollapsibleSection({
   }, [hasExpanded, section.tokens, links, fileDir]);
 
   return (
-    <div className="collapsible-section">
+    <div className={`collapsible-section collapsible-section-L${level}`}>
       <button
         ref={headingRef}
         className={`collapsible-heading-row collapsible-heading-row-L${section.heading.level}`}

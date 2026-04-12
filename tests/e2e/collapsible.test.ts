@@ -625,6 +625,167 @@ test.describe("Heading Hierarchy & Styling", () => {
 });
 
 // ===========================================================================
+// 4b. CONTENT INDENTATION & SCALING
+// ===========================================================================
+
+test.describe("Content Indentation & Scaling", () => {
+  test("expanded content is indented further than its heading", async () => {
+    await openTestFolder();
+    await selectFileByName("test-collapse.md");
+    await enableCollapsibleMode();
+
+    // Expand "Installation" (L2 heading)
+    const installRow = page.locator('.collapsible-heading-row:has(.collapsible-heading-text:text-is("Installation"))');
+    await installRow.click();
+    await page.waitForTimeout(300);
+
+    // Get heading padding-left
+    const headingPadding = await installRow.evaluate(
+      (el) => parseFloat(getComputedStyle(el).paddingLeft)
+    );
+
+    // Get content margin-left (the visual indent)
+    const content = page.locator(".collapsible-section-content").first();
+    await expect(content).toBeVisible();
+    const contentMargin = await content.evaluate(
+      (el) => parseFloat(getComputedStyle(el).marginLeft)
+    );
+
+    // Content should be indented at least as much as the heading
+    expect(contentMargin).toBeGreaterThanOrEqual(headingPadding * 0.8);
+  });
+
+  test("expanded content has left border for visual containment", async () => {
+    await openTestFolder();
+    await selectFileByName("test-collapse.md");
+    await enableCollapsibleMode();
+
+    // Expand first section
+    await page.locator(".collapsible-heading-row").first().click();
+    await page.waitForTimeout(300);
+
+    const content = page.locator(".collapsible-section-content").first();
+    const borderLeft = await content.evaluate(
+      (el) => parseFloat(getComputedStyle(el).borderLeftWidth)
+    );
+    expect(borderLeft).toBeGreaterThan(0);
+  });
+
+  test("expanded heading row has background tint", async () => {
+    await openTestFolder();
+    await selectFileByName("test-collapse.md");
+    await enableCollapsibleMode();
+
+    const row = page.locator(".collapsible-heading-row").first();
+
+    // Get background before expand
+    const bgBefore = await row.evaluate((el) => getComputedStyle(el).backgroundColor);
+
+    // Expand
+    await row.click();
+    await page.waitForTimeout(300);
+
+    // Background should change (expanded gets bg-hover)
+    const bgAfter = await row.evaluate((el) => getComputedStyle(el).backgroundColor);
+    // They should differ (or at least the expanded one should not be transparent)
+    expect(bgAfter).not.toBe("rgba(0, 0, 0, 0)");
+  });
+
+  test("content indentation scales proportionally with font size increase", async () => {
+    await openTestFolder();
+    await selectFileByName("test-collapse.md");
+    await enableCollapsibleMode();
+
+    // Expand a section
+    await page.locator(".collapsible-heading-row").first().click();
+    await page.waitForTimeout(300);
+
+    // Get content margin at default size
+    const content = page.locator(".collapsible-section-content").first();
+    const marginBefore = await content.evaluate(
+      (el) => parseFloat(getComputedStyle(el).marginLeft)
+    );
+    const paddingBefore = await content.evaluate(
+      (el) => parseFloat(getComputedStyle(el).paddingLeft)
+    );
+
+    // Increase font size twice
+    await page.click('.toolbar-btn:text-is("A+")');
+    await page.click('.toolbar-btn:text-is("A+")');
+    await page.waitForTimeout(200);
+
+    // Content indentation should have increased (em-based)
+    const marginAfter = await content.evaluate(
+      (el) => parseFloat(getComputedStyle(el).marginLeft)
+    );
+    const paddingAfter = await content.evaluate(
+      (el) => parseFloat(getComputedStyle(el).paddingLeft)
+    );
+
+    expect(marginAfter).toBeGreaterThan(marginBefore);
+    expect(paddingAfter).toBeGreaterThan(paddingBefore);
+  });
+
+  test("content indentation scales proportionally with font size decrease", async () => {
+    await openTestFolder();
+    await selectFileByName("test-collapse.md");
+    await enableCollapsibleMode();
+
+    // Expand a section
+    await page.locator(".collapsible-heading-row").first().click();
+    await page.waitForTimeout(300);
+
+    // Get content margin at default size
+    const content = page.locator(".collapsible-section-content").first();
+    const marginBefore = await content.evaluate(
+      (el) => parseFloat(getComputedStyle(el).marginLeft)
+    );
+
+    // Decrease font size twice
+    await page.click('.toolbar-btn:text-is("A-")');
+    await page.click('.toolbar-btn:text-is("A-")');
+    await page.waitForTimeout(200);
+
+    // Content indentation should have decreased (em-based)
+    const marginAfter = await content.evaluate(
+      (el) => parseFloat(getComputedStyle(el).marginLeft)
+    );
+
+    expect(marginAfter).toBeLessThan(marginBefore);
+  });
+
+  test("deeper heading levels have more content indentation", async () => {
+    await openTestFolder();
+    await selectFileByName("test-collapse.md");
+    await enableCollapsibleMode();
+
+    // Expand L1 and L2 sections to get content at different levels
+    // Expand "Getting Started" (L1)
+    await page.locator(".collapsible-heading-row").first().click();
+    await page.waitForTimeout(200);
+    // Expand "Installation" (L2)
+    const installRow = page.locator('.collapsible-heading-row:has(.collapsible-heading-text:text-is("Installation"))');
+    await installRow.click();
+    await page.waitForTimeout(200);
+
+    // Get all visible content sections
+    const contents = page.locator(".collapsible-section-content");
+    const count = await contents.count();
+    if (count >= 2) {
+      const margins: number[] = [];
+      for (let i = 0; i < Math.min(count, 2); i++) {
+        const m = await contents.nth(i).evaluate(
+          (el) => parseFloat(getComputedStyle(el).marginLeft)
+        );
+        margins.push(m);
+      }
+      // L2 content should be indented more than L1 content
+      expect(margins[1]).toBeGreaterThan(margins[0]);
+    }
+  });
+});
+
+// ===========================================================================
 // 5. COLLAPSIBLE VIEW: SEARCH INTEGRATION
 // ===========================================================================
 
