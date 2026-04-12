@@ -121,12 +121,12 @@ let linkIndexBuildGen = 0;
 
 function rebuildLinkIndex(): void {
   const roots = Array.from(allowedRoots);
+  // Always increment gen — even zero-root case — so in-flight builds can't restore stale state
+  const gen = ++linkIndexBuildGen;
   if (roots.length === 0) {
     linkIndex = null;
     return;
   }
-  // Generation token prevents stale builds from overwriting newer ones
-  const gen = ++linkIndexBuildGen;
   buildLinkIndexAsync(roots, collectMarkdownFiles, allowedRoots).then((index) => {
     if (gen === linkIndexBuildGen) {
       linkIndex = index;

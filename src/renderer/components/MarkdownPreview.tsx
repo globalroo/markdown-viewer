@@ -290,6 +290,7 @@ export function MarkdownPreview() {
       useAppStore.getState().setTabScrollPosition(prevFileRef.current, scrollRef.current.scrollTop);
     }
     prevFileRef.current = selectedFile;
+    lastRenderedHtmlRef.current = ""; // Clear stale export cache on file switch
 
     if (!selectedFile) return;
 
