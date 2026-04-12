@@ -757,9 +757,11 @@ export function MarkdownPreview() {
   }, []);
 
   const handleExportHTML = useCallback(async () => {
-    // In edit mode, html is "" for performance. Fall back to the last preview render.
-    // This exports what the user last saw, not unsaved draft edits. Cleared on file switch.
-    const exportHtml = html || lastRenderedHtmlRef.current;
+    // In edit mode, render export HTML from the current draft on demand.
+    // This ensures exports always reflect what the user is working on.
+    const exportHtml = html || (editDirty && sectionModel && selectedFile
+      ? renderMarkdownFromModel(buildSectionModel(editContent, selectedFile), selectedFile)
+      : lastRenderedHtmlRef.current);
     if (!exportHtml) return;
     // Rewrite local-img:// protocol URLs back to file:// for portability
     // Keep paths URL-encoded so embedLocalImages can parse them correctly
@@ -792,9 +794,11 @@ export function MarkdownPreview() {
   }, []);
 
   const handleExportDOCX = useCallback(async () => {
-    // In edit mode, html is "" for performance. Fall back to the last preview render.
-    // This exports what the user last saw, not unsaved draft edits. Cleared on file switch.
-    const exportHtml = html || lastRenderedHtmlRef.current;
+    // In edit mode, render export HTML from the current draft on demand.
+    // This ensures exports always reflect what the user is working on.
+    const exportHtml = html || (editDirty && sectionModel && selectedFile
+      ? renderMarkdownFromModel(buildSectionModel(editContent, selectedFile), selectedFile)
+      : lastRenderedHtmlRef.current);
     if (!exportHtml) return;
     // Keep paths URL-encoded so embedLocalImages can parse them correctly
     // (decoding here would break filenames containing # or ?)

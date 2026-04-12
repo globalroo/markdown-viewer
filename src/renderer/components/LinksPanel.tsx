@@ -1,4 +1,4 @@
-import { useCallback, useRef } from "react";
+import { useCallback } from "react";
 import { useAppStore } from "../store";
 
 function LinkIcon() {
@@ -70,21 +70,12 @@ export function LinksPanel() {
   const selectFile = useAppStore((s) => s.selectFile);
   const selectedFile = useAppStore((s) => s.selectedFile);
 
-  const navigateGenRef = useRef(0);
-
-  const handleNavigate = useCallback(async (filePath: string) => {
-    const gen = ++navigateGenRef.current;
-    try {
-      const content = await window.api.readFile(filePath);
-      // Discard if another navigation happened while we were loading
-      if (gen !== navigateGenRef.current) return;
-      const store = useAppStore.getState();
-      store.selectFile(filePath);
-      store.setMarkdownContent(content);
-      store.openTab(filePath);
-    } catch {
-      // File may not exist (broken link)
-    }
+  const handleNavigate = useCallback((filePath: string) => {
+    // Use selectFile + openTab only — MarkdownPreview's useEffect handles
+    // reading the file content and the dirty-draft save/discard guard.
+    const store = useAppStore.getState();
+    store.openTab(filePath);
+    store.selectFile(filePath);
   }, []);
 
   if (!linkGraph || !selectedFile) {

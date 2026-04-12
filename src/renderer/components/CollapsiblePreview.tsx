@@ -279,6 +279,8 @@ export function CollapsiblePreview({ sectionModel, selectedFile, onClick }: Coll
   }, [sectionModel, selectedFile, scheduleSave]);
 
   const toggle = useCallback((id: string) => {
+    // Don't mutate fold state during search-expanded mode
+    if (searchExpanded) return;
     setExpandedSet((prev) => {
       const next = new Set(prev);
       if (next.has(id)) {
@@ -292,20 +294,22 @@ export function CollapsiblePreview({ sectionModel, selectedFile, onClick }: Coll
   }, [selectedFile, scheduleSave]);
 
   const expandAll = useCallback(() => {
+    if (searchExpanded) return;
     setNoTransition(true);
     const all = new Set(sectionModel.flatHeadings.map((h) => h.id));
     setExpandedSet(all);
     scheduleSave(selectedFile, all);
     requestAnimationFrame(() => setNoTransition(false));
-  }, [sectionModel.flatHeadings, selectedFile, scheduleSave]);
+  }, [sectionModel.flatHeadings, selectedFile, scheduleSave, searchExpanded]);
 
   const collapseAll = useCallback(() => {
+    if (searchExpanded) return;
     setNoTransition(true);
     const empty = new Set<string>();
     setExpandedSet(empty);
     scheduleSave(selectedFile, empty);
     requestAnimationFrame(() => setNoTransition(false));
-  }, [selectedFile, scheduleSave]);
+  }, [selectedFile, scheduleSave, searchExpanded]);
 
   // All headings are always visible (children outside collapsible body).
   // Just validate focusedId still exists after heading changes (editing).
