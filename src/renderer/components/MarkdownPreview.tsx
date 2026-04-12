@@ -759,8 +759,9 @@ export function MarkdownPreview() {
   const handleExportHTML = useCallback(async () => {
     // In edit mode, always render from editContent on demand (whether dirty or just saved).
     // editMode stays true after save, so we can't rely on editDirty alone.
-    const exportHtml = html || (editMode && editContent && selectedFile
-      ? renderMarkdownFromModel(buildSectionModel(editContent, selectedFile), selectedFile)
+    // Use editContent even when empty (intentional blank draft).
+    const exportHtml = html || (editMode && selectedFile
+      ? renderMarkdownFromModel(buildSectionModel(editContent || "", selectedFile), selectedFile)
       : lastRenderedHtmlRef.current);
     if (!exportHtml) return;
     // Rewrite local-img:// protocol URLs back to file:// for portability
@@ -796,8 +797,9 @@ export function MarkdownPreview() {
   const handleExportDOCX = useCallback(async () => {
     // In edit mode, always render from editContent on demand (whether dirty or just saved).
     // editMode stays true after save, so we can't rely on editDirty alone.
-    const exportHtml = html || (editMode && editContent && selectedFile
-      ? renderMarkdownFromModel(buildSectionModel(editContent, selectedFile), selectedFile)
+    // Use editContent even when empty (intentional blank draft).
+    const exportHtml = html || (editMode && selectedFile
+      ? renderMarkdownFromModel(buildSectionModel(editContent || "", selectedFile), selectedFile)
       : lastRenderedHtmlRef.current);
     if (!exportHtml) return;
     // Keep paths URL-encoded so embedLocalImages can parse them correctly
