@@ -107,10 +107,10 @@ function flushFoldState(): void {
   }
   try {
     atomicWriteJson(getFoldStatePath(), foldStateCache);
+    foldStateDirty = false;
   } catch {
-    // Non-critical — fold state loss is acceptable
+    // Keep foldStateDirty = true so next flush retries
   }
-  foldStateDirty = false;
 }
 
 // --- Link index ---

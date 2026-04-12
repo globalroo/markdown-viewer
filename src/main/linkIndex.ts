@@ -100,12 +100,25 @@ function commonPrefixLength(a: string, b: string): number {
   return i;
 }
 
-/** Check if a resolved path falls within any allowed root */
+/** Check if a resolved path falls within any allowed root (canonicalized) */
 function isWithinRoots(resolvedPath: string, allowedRoots: Set<string>): boolean {
+  // Canonicalize to handle symlinks — fall back to normalize if file doesn't exist
+  let canonical: string;
+  try {
+    canonical = fs.realpathSync(resolvedPath);
+  } catch {
+    canonical = path.normalize(resolvedPath);
+  }
   for (const root of allowedRoots) {
-    if (resolvedPath === root) return true;
-    const prefix = root.endsWith(path.sep) ? root : root + path.sep;
-    if (resolvedPath.startsWith(prefix)) return true;
+    let canonicalRoot: string;
+    try {
+      canonicalRoot = fs.realpathSync(root);
+    } catch {
+      canonicalRoot = path.normalize(root);
+    }
+    if (canonical === canonicalRoot) return true;
+    const prefix = canonicalRoot.endsWith(path.sep) ? canonicalRoot : canonicalRoot + path.sep;
+    if (canonical.startsWith(prefix)) return true;
   }
   return false;
 }
