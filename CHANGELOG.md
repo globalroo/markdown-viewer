@@ -1,5 +1,36 @@
 # Changelog
 
+## [1.7.0] - 2026-04-12
+
+### Added
+
+- **Collapsible document view** — opt-in preview mode that renders headings as an always-visible expandable/collapsible tree. Default starts collapsed for instant document overview. Keyboard navigation (j/k move, Enter/Space expand, Escape collapse, [ ] collapse/expand all). Cmd+F auto-expands all sections for native find, Escape restores previous state.
+- **Fold state persistence** — expanded/collapsed state saved per document across sessions. Debounced writes with LRU cap (300 documents). Heading ID transfer via LCS diff preserves state across document edits.
+- **Link intelligence** — main-process link index parses all markdown files for forward/backlinks (standard links + wiki-links). Async chunked build prevents UI freeze on large projects. Incremental updates on file change, rename, move.
+- **Links panel** — right-side panel showing outgoing and incoming links for the selected file. Click to navigate. Segmented control switches between Contents (outline) and Links views.
+- **Broken/stale link detection** — outgoing links show visual indicators: dimmed + strikethrough for missing targets, orange dot for files modified since last viewed.
+- **Connected files filter** — filter sidebar file tree to show only documents linked to/from the selected file. 1-hop and 2-hop depth selector. Dismissible pill in sidebar. Auto-expands ancestor directories.
+- **Right panel font scaling** — outline and links panel text scales proportionally with A+/A- font size controls via container-level em inheritance.
+- **Left-border spine** — heading rows in collapsible mode show accent-colored left border fading by depth level for instant hierarchy recognition.
+- **Comprehensive test suite** — 74 E2E tests (Playwright) + 235 unit tests (Vitest) = 309 total, covering all new features, edge cases, layout verification, and regression scenarios.
+
+### Fixed
+
+- **Path traversal prevention** — link index validates resolved paths against allowed project roots using realpathSync canonicalization. Prevents filesystem information disclosure via malicious relative links.
+- **Atomic JSON writes** — fold-state.json and user-config.json use write-tmp-then-rename pattern to prevent corruption on process crash. Failed writes retry automatically.
+- **Edit mode performance** — HTML rendering skipped when preview is hidden during editing. Section model still rebuilds so document outline stays in sync.
+- **Export in edit mode** — HTML/DOCX export renders from current draft on demand instead of stale last-previewed content. Works correctly after save (editMode vs editDirty).
+- **Safe navigation** — all file navigation (links panel, wiki-links, content search) goes through the dirty-draft save/discard guard.
+- **Style check in collapsible mode** — MutationObserver re-applies prose highlights when collapsible sections expand.
+- **DOMPurify config** — shared sanitization config extracted to prevent drift between standard and collapsible preview.
+- **Search/Escape interaction** — fold mutations locked during Cmd+F search-expanded state to prevent accidental persistence of transient state.
+
+### Changed
+
+- **Document outline** — now derives headings from shared section model (token-annotated heading IDs) instead of DOM scraping. IntersectionObserver tracks headings by ID for mode-agnostic active heading highlight.
+- **Heading hierarchy in collapsible mode** — compressed document typography (L1=1.6em/700 → L6=0.95em/600) with 0.88em body text for clear scanability. Content indentation aligns with own heading level.
+- **Shared wiki-link regex** — extracted to src/shared/linkPatterns.ts, used by both renderer and main process.
+
 ## [1.6.3] - 2026-04-11
 
 ### Fixed
