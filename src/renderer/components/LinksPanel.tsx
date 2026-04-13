@@ -69,6 +69,8 @@ export function LinksPanel() {
   const linkGraph = useAppStore((s) => s.linkGraph);
   const selectFile = useAppStore((s) => s.selectFile);
   const selectedFile = useAppStore((s) => s.selectedFile);
+  const linksFilterActive = useAppStore((s) => s.linksFilterActive);
+  const toggleLinksFilter = useAppStore((s) => s.toggleLinksFilter);
 
   const handleNavigate = useCallback((filePath: string) => {
     // Use selectFile + openTab only — MarkdownPreview's useEffect handles
@@ -87,8 +89,6 @@ export function LinksPanel() {
   }
 
   const { outgoing, incoming, outgoingContexts, incomingContexts, outgoingStatus, staleTargets } = linkGraph;
-  const linksFilterActive = useAppStore((s) => s.linksFilterActive);
-  const toggleLinksFilter = useAppStore((s) => s.toggleLinksFilter);
   const totalLinks = outgoing.length + incoming.length;
 
   return (
