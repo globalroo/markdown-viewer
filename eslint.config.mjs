@@ -23,9 +23,11 @@ export default tseslint.config(
       "react-hooks": reactHooks,
     },
     rules: {
-      // The rule that catches the React #300 class of bugs.
+      // Catches the React #300 class of bugs (conditional hook calls).
       "react-hooks/rules-of-hooks": "error",
-      "react-hooks/exhaustive-deps": "warn",
+      // Catches stale-closure bugs in useEffect/useCallback/useMemo deps.
+      // Promoted to error once the existing backlog was cleared.
+      "react-hooks/exhaustive-deps": "error",
 
       // Relax a few base rules that don't fit this codebase's style.
       // They're defensible to re-enable later in a separate pass.

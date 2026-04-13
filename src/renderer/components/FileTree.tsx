@@ -1,5 +1,5 @@
 import { useAppStore } from "../store";
-import { useCallback, useMemo, useState, useRef, useEffect, memo } from "react";
+import { useCallback, useMemo, useState, useRef, useEffect } from "react";
 import { ChevronIcon, FolderIcon, FileIcon } from "./Icons";
 import { ContextMenu } from "./ContextMenu";
 
@@ -223,7 +223,7 @@ function TreeItem({
       const msg = err instanceof Error ? err.message : "Move failed";
       alert(msg);
     }
-  }, [node.type, node.path, projectRootPath]);
+  }, [node.path, dropTargetPath, projectRootPath]);
 
   return (
     <>

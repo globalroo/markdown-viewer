@@ -162,7 +162,16 @@ test.describe("close all tabs", () => {
     // Collect console errors
     const consoleErrors: string[] = [];
     page.on("console", (msg) => {
-      if (msg.type() === "error") consoleErrors.push(msg.text());
+      // Collect console errors plus any React-hook-related warnings —
+      // React 19 logs dev-mode Rules-of-Hooks violations via console.error,
+      // but some hook lifecycle warnings surface as "warning" type. Treating
+      // those as failures catches the class of bug that caused React #300.
+      const text = msg.text();
+      if (msg.type() === "error") {
+        consoleErrors.push(text);
+      } else if (msg.type() === "warning" && /hook|React has detected/i.test(text)) {
+        consoleErrors.push(text);
+      }
     });
 
     await openTestFolder();
@@ -206,7 +215,16 @@ test.describe("close all tabs", () => {
   test("closing last tab in edit mode shows empty state", async () => {
     const consoleErrors: string[] = [];
     page.on("console", (msg) => {
-      if (msg.type() === "error") consoleErrors.push(msg.text());
+      // Collect console errors plus any React-hook-related warnings —
+      // React 19 logs dev-mode Rules-of-Hooks violations via console.error,
+      // but some hook lifecycle warnings surface as "warning" type. Treating
+      // those as failures catches the class of bug that caused React #300.
+      const text = msg.text();
+      if (msg.type() === "error") {
+        consoleErrors.push(text);
+      } else if (msg.type() === "warning" && /hook|React has detected/i.test(text)) {
+        consoleErrors.push(text);
+      }
     });
 
     await openTestFolder();
@@ -235,7 +253,16 @@ test.describe("close all tabs", () => {
   test("rapidly closing all tabs does not crash", async () => {
     const consoleErrors: string[] = [];
     page.on("console", (msg) => {
-      if (msg.type() === "error") consoleErrors.push(msg.text());
+      // Collect console errors plus any React-hook-related warnings —
+      // React 19 logs dev-mode Rules-of-Hooks violations via console.error,
+      // but some hook lifecycle warnings surface as "warning" type. Treating
+      // those as failures catches the class of bug that caused React #300.
+      const text = msg.text();
+      if (msg.type() === "error") {
+        consoleErrors.push(text);
+      } else if (msg.type() === "warning" && /hook|React has detected/i.test(text)) {
+        consoleErrors.push(text);
+      }
     });
 
     await openTestFolder();
@@ -269,7 +296,16 @@ test.describe("close all tabs", () => {
   test("closing all tabs in collapsible mode shows empty state", async () => {
     const consoleErrors: string[] = [];
     page.on("console", (msg) => {
-      if (msg.type() === "error") consoleErrors.push(msg.text());
+      // Collect console errors plus any React-hook-related warnings —
+      // React 19 logs dev-mode Rules-of-Hooks violations via console.error,
+      // but some hook lifecycle warnings surface as "warning" type. Treating
+      // those as failures catches the class of bug that caused React #300.
+      const text = msg.text();
+      if (msg.type() === "error") {
+        consoleErrors.push(text);
+      } else if (msg.type() === "warning" && /hook|React has detected/i.test(text)) {
+        consoleErrors.push(text);
+      }
     });
 
     await openTestFolder();
@@ -300,7 +336,16 @@ test.describe("close all tabs", () => {
   test("closing tabs after toggling collapse states on multiple files", async () => {
     const consoleErrors: string[] = [];
     page.on("console", (msg) => {
-      if (msg.type() === "error") consoleErrors.push(msg.text());
+      // Collect console errors plus any React-hook-related warnings —
+      // React 19 logs dev-mode Rules-of-Hooks violations via console.error,
+      // but some hook lifecycle warnings surface as "warning" type. Treating
+      // those as failures catches the class of bug that caused React #300.
+      const text = msg.text();
+      if (msg.type() === "error") {
+        consoleErrors.push(text);
+      } else if (msg.type() === "warning" && /hook|React has detected/i.test(text)) {
+        consoleErrors.push(text);
+      }
     });
 
     await openTestFolder();
@@ -365,7 +410,16 @@ test.describe("close all tabs", () => {
   test("closing all tabs with outline visible shows empty state", async () => {
     const consoleErrors: string[] = [];
     page.on("console", (msg) => {
-      if (msg.type() === "error") consoleErrors.push(msg.text());
+      // Collect console errors plus any React-hook-related warnings —
+      // React 19 logs dev-mode Rules-of-Hooks violations via console.error,
+      // but some hook lifecycle warnings surface as "warning" type. Treating
+      // those as failures catches the class of bug that caused React #300.
+      const text = msg.text();
+      if (msg.type() === "error") {
+        consoleErrors.push(text);
+      } else if (msg.type() === "warning" && /hook|React has detected/i.test(text)) {
+        consoleErrors.push(text);
+      }
     });
 
     await openTestFolder();
@@ -398,7 +452,16 @@ test.describe("close all tabs", () => {
   test("closing tabs with collapsible mode + style check + outline active", async () => {
     const consoleErrors: string[] = [];
     page.on("console", (msg) => {
-      if (msg.type() === "error") consoleErrors.push(msg.text());
+      // Collect console errors plus any React-hook-related warnings —
+      // React 19 logs dev-mode Rules-of-Hooks violations via console.error,
+      // but some hook lifecycle warnings surface as "warning" type. Treating
+      // those as failures catches the class of bug that caused React #300.
+      const text = msg.text();
+      if (msg.type() === "error") {
+        consoleErrors.push(text);
+      } else if (msg.type() === "warning" && /hook|React has detected/i.test(text)) {
+        consoleErrors.push(text);
+      }
     });
 
     await openTestFolder();
@@ -436,7 +499,16 @@ test.describe("close all tabs", () => {
   test("kitchen sink: theme + collapsible + mermaid + links + outline, close all tabs", async () => {
     const consoleErrors: string[] = [];
     page.on("console", (msg) => {
-      if (msg.type() === "error") consoleErrors.push(msg.text());
+      // Collect console errors plus any React-hook-related warnings —
+      // React 19 logs dev-mode Rules-of-Hooks violations via console.error,
+      // but some hook lifecycle warnings surface as "warning" type. Treating
+      // those as failures catches the class of bug that caused React #300.
+      const text = msg.text();
+      if (msg.type() === "error") {
+        consoleErrors.push(text);
+      } else if (msg.type() === "warning" && /hook|React has detected/i.test(text)) {
+        consoleErrors.push(text);
+      }
     });
 
     await openTestFolder();
@@ -499,7 +571,16 @@ test.describe("close all tabs", () => {
   test("collapsible + links panel + mixed fold states across files, close all", async () => {
     const consoleErrors: string[] = [];
     page.on("console", (msg) => {
-      if (msg.type() === "error") consoleErrors.push(msg.text());
+      // Collect console errors plus any React-hook-related warnings —
+      // React 19 logs dev-mode Rules-of-Hooks violations via console.error,
+      // but some hook lifecycle warnings surface as "warning" type. Treating
+      // those as failures catches the class of bug that caused React #300.
+      const text = msg.text();
+      if (msg.type() === "error") {
+        consoleErrors.push(text);
+      } else if (msg.type() === "warning" && /hook|React has detected/i.test(text)) {
+        consoleErrors.push(text);
+      }
     });
 
     await openTestFolder();
@@ -513,12 +594,15 @@ test.describe("close all tabs", () => {
     await page.click('[aria-label="Collapsible view off"]');
     await expect(page.locator(".collapsible-preview")).toBeVisible({ timeout: 2000 });
 
-    // Switch right panel to Links view
-    const linksBtn = page.locator('.segmented-btn:text-is("Links")');
-    if ((await linksBtn.count()) > 0) {
-      await linksBtn.click();
-      await page.waitForTimeout(200);
-    }
+    // Switch right panel to Links view. The Links segmented button lives in
+    // the outline header and uses its own class (.outline-segment) — an
+    // earlier version of this test looked for .segmented-btn (which only
+    // matches Settings controls), so the Links panel was never actually
+    // mounted and the hook-ordering bug in LinksPanel went undetected.
+    const linksBtn = page.locator('.outline-segment:text-is("Links")');
+    await expect(linksBtn).toBeVisible({ timeout: 2000 });
+    await linksBtn.click();
+    await expect(page.locator(".links-panel-body, .links-panel-empty")).toBeVisible({ timeout: 2000 });
 
     // Browse files and toggle collapse states to create non-default fold state
     // File 03 — expand all then collapse a couple

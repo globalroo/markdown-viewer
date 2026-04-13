@@ -67,7 +67,6 @@ function LinkItem({ filePath, context, broken, stale, onNavigate }: LinkItemProp
 
 export function LinksPanel() {
   const linkGraph = useAppStore((s) => s.linkGraph);
-  const selectFile = useAppStore((s) => s.selectFile);
   const selectedFile = useAppStore((s) => s.selectedFile);
   const linksFilterActive = useAppStore((s) => s.linksFilterActive);
   const toggleLinksFilter = useAppStore((s) => s.toggleLinksFilter);
