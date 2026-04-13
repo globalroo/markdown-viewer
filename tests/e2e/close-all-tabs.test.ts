@@ -684,4 +684,53 @@ test.describe("close all tabs", () => {
     await expect(page.locator(".preview-content h1")).toHaveText("File 1");
     expect(await getTabCount()).toBe(1);
   });
+
+  // Dedicated regression test for React minified error #300 ("Rendered fewer
+  // hooks than expected") that crashed the packaged app when the Links panel
+  // had been mounted. Intentionally minimal so future readers can see the
+  // exact path being guarded.
+  test("React #300 regression: open Links panel then close all tabs", async () => {
+    const consoleErrors: string[] = [];
+    page.on("console", (msg) => {
+      const text = msg.text();
+      if (msg.type() === "error") {
+        consoleErrors.push(text);
+      } else if (
+        msg.type() === "warning" &&
+        /hook|React has detected/i.test(text)
+      ) {
+        consoleErrors.push(text);
+      }
+    });
+
+    await openTestFolder();
+
+    // Open three tabs with inter-file links so linkGraph is non-empty.
+    await selectFileByName("file-01.md");
+    await selectFileByName("file-02.md");
+    await selectFileByName("file-03.md");
+
+    // Mount the Links panel — this is the code path whose hook-ordering
+    // violation caused React #300 in production when selectedFile later
+    // flipped to null on close-all.
+    const linksBtn = page.locator('.outline-segment:text-is("Links")');
+    await expect(linksBtn).toBeVisible({ timeout: 2000 });
+    await linksBtn.click();
+    await expect(
+      page.locator(".links-panel-body, .links-panel-empty")
+    ).toBeVisible({ timeout: 2000 });
+
+    // Close every tab — selectedFile → null with LinksPanel still mounted.
+    for (let i = 0; i < 3; i++) {
+      await closeActiveTab();
+    }
+
+    // Empty state renders — not a blank window from a crashed renderer.
+    await expect(page.locator(".preview-empty")).toBeVisible({ timeout: 3000 });
+
+    const relevant = consoleErrors.filter(
+      (e) => !e.includes("Electron Security Warning")
+    );
+    expect(relevant).toEqual([]);
+  });
 });
