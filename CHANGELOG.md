@@ -1,5 +1,30 @@
 # Changelog
 
+## [1.7.2] - 2026-04-13
+
+### Fixed
+
+- **React #300 crash on close-all-tabs** — `LinksPanel` called two `useAppStore` subscriptions after an early return, so the hook count flipped between 4 and 6 as `selectedFile` transitioned. React 19 production throws minified error #300 ("Rendered fewer hooks than expected") on hook-count mismatches; dev only warns, which is why the crash only reproduced in the packaged DMG. Moved both subscriptions above the early return so the hook count is invariant across renders.
+- **Silent e2e test skip masked the bug** — `close-all-tabs.test.ts` already had a scenario exercising the Links panel during close-all, but the selector (`.segmented-btn:text-is("Links")`) targeted the wrong CSS class (Settings controls, not the outline Links button). The `if (count > 0)` guard silently skipped the click for months. Fixed selector to `.outline-segment`, removed the silent-skip guard, and added a `toBeVisible` assertion so future class renames fail loudly.
+- **Real stale-closure bugs surfaced by the new lint gate**:
+  - `CollapsiblePreview.toggle` missed `searchExpanded` in its deps — the callback retained a stale `false` value, allowing fold-state mutation during search-expanded mode (which the comment explicitly forbids).
+  - `CollapsiblePreview.links` `|| {}` fallback allocated a fresh object every render, invalidating the `preambleHtml` useMemo deps on every render. Wrapped in its own `useMemo` to stabilise the reference.
+  - `FileTree.handleDrop` missed `dropTargetPath` in its deps.
+  - `MarkdownPreview.handleExport{HTML,DOCX}` had redundant `sectionModel` deps.
+  - `Sidebar` search-results click handler had a redundant `selectFile` dep from an unused subscription.
+
+### Added
+
+- **ESLint gate** — new flat config (`eslint.config.mjs`) with `eslint-plugin-react-hooks`. The `rules-of-hooks` rule catches the conditional-hook-call class of bug statically, at lint time, before any runtime reproduction is needed. `exhaustive-deps` is also enabled as `error` (after clearing the existing backlog), catching stale-closure bugs in the same pass.
+- **CI workflow** (`.github/workflows/ci.yml`) — runs lint, typecheck/build, and unit tests on every PR and push to main. Replaces the previous release-only CI.
+- **LinksPanel regression unit test** — verified to hard-fail on the pre-fix code via React's "Rendered more hooks than during the previous render" invariant, so future regressions of the same class produce a loud, immediate failure rather than a silent production crash.
+- **Focused React #300 e2e test** — dedicated `close-all-tabs.test.ts` entry that opens the Links panel and closes all tabs, asserting no console errors or React hook warnings. Named unambiguously so future readers can identify the guarded scenario at a glance.
+
+### Changed
+
+- **Console listeners in close-all e2e tests** now collect React-hook-related `console.warn` messages in addition to `console.error`, closing the gap where dev-mode hook warnings were ignored.
+- **Dead imports removed** — `buildLinkIndex` (main.ts), `memo` (FileTree.tsx), `useCallback`/`useState`/`FontId` (Settings.tsx), `toggleStyleCheck` subscription (MarkdownPreview.tsx), `selectFile` subscription (LinksPanel.tsx, Sidebar.tsx).
+
 ## [1.7.1] - 2026-04-13
 
 ### Added
