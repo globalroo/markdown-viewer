@@ -432,6 +432,17 @@ export const useAppStore = create<AppState>((set) => ({
         if (openTabs.length === 0) {
           activeTab = null;
           selectedFile = null;
+          // Reset edit state completely when last tab closes
+          return {
+            openTabs,
+            activeTab,
+            selectedFile,
+            markdownContent: "",
+            editMode: false,
+            editContent: "",
+            editDirty: false,
+            editFilePath: null,
+          };
         } else {
           activeTab = openTabs[Math.min(idx, openTabs.length - 1)].filePath;
           selectedFile = activeTab;

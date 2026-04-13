@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.7.1] - 2026-04-13
+
+### Added
+
+- **Error boundary** — React crashes now show the error message, stack trace, and a recovery button instead of a blank white screen. Logs the error to console for debugging.
+- **Close-all-tabs E2E test suite** — 10 Playwright tests covering: closing 15 tabs one-by-one, edit mode, rapid close, collapsible mode, mixed fold states across files, links panel active, style check, outline visible, mermaid/math/wiki-link content, sepia theme, and post-close recovery.
+
+### Fixed
+
+- **Edit state reset on last tab close** — closing the final tab now fully resets `editMode`, `editContent`, `editDirty`, and `editFilePath` to prevent orphaned edit state.
+- **Cmd+W always prevented** — `preventDefault()` fires unconditionally on Cmd/Ctrl+W (ahead of the settings/editing guards) so Electron never falls through to "Close Window". Tab closure is whitelisted inside the editor textarea so Cmd+W still closes the active tab while editing.
+- **Print from edit mode** — replaced the inline `display: none` on `.preview-content` with a `.preview-content-hidden` CSS class so the `@media print` override (`display: block !important`) reliably wins the cascade. Fixes flaky print-mode E2E test and blank-preview behaviour when printing from edit mode.
+
 ## [1.7.0] - 2026-04-12
 
 ### Added

@@ -578,6 +578,65 @@ body {
   margin-bottom: 24px;
 }
 
+/* Error Boundary */
+.error-boundary {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  padding: 32px;
+  background: var(--bg-primary, #faf9f7);
+  color: var(--text-primary, #1c1917);
+}
+
+.error-boundary-content {
+  max-width: 640px;
+  text-align: center;
+}
+
+.error-boundary-content h2 {
+  font-size: 20px;
+  font-weight: 500;
+  margin-bottom: 12px;
+}
+
+.error-boundary-message {
+  font-size: 14px;
+  color: #b91c1c;
+  margin-bottom: 16px;
+}
+
+.error-boundary-stack {
+  text-align: left;
+  font-size: 11px;
+  line-height: 1.5;
+  background: var(--bg-secondary, #f0eeeb);
+  border: 1px solid var(--border-color, #e0ddd9);
+  border-radius: 6px;
+  padding: 12px;
+  max-height: 240px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin-bottom: 20px;
+}
+
+.error-boundary-btn {
+  padding: 8px 20px;
+  font-size: 13px;
+  font-weight: 500;
+  border: 1px solid var(--border-color, #e0ddd9);
+  border-radius: 6px;
+  background: var(--bg-primary, #faf9f7);
+  color: var(--text-primary, #1c1917);
+  cursor: pointer;
+}
+
+.error-boundary-btn:hover {
+  background: var(--bg-secondary, #f0eeeb);
+}
+
 .shortcut-list {
   display: inline-flex;
   flex-direction: column;
@@ -661,6 +720,10 @@ body {
   padding: 32px;
   line-height: var(--line-height, 1.45);
   width: 100%;
+}
+
+.preview-content-hidden {
+  display: none;
 }
 
 

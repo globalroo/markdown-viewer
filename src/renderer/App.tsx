@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, Component, type ReactNode } from "react";
 import { Sidebar } from "./components/Sidebar";
 import { MarkdownPreview } from "./components/MarkdownPreview";
 import { DocumentOutline } from "./components/DocumentOutline";
@@ -9,6 +9,42 @@ import { useAppStore } from "./store";
 import "./styles/app.css";
 import "./styles/themes.css";
 import "highlight.js/styles/github.css";
+
+class ErrorBoundary extends Component<
+  { children: ReactNode },
+  { error: Error | null }
+> {
+  state: { error: Error | null } = { error: null };
+
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
+    console.error("viewmd crashed:", error, info.componentStack);
+  }
+
+  render() {
+    if (!this.state.error) return this.props.children;
+    const msg = this.state.error.message;
+    const stack = this.state.error.stack || "";
+    return (
+      <div className="error-boundary">
+        <div className="error-boundary-content">
+          <h2>Something went wrong</h2>
+          <p className="error-boundary-message">{msg}</p>
+          <pre className="error-boundary-stack">{stack}</pre>
+          <button
+            className="error-boundary-btn"
+            onClick={() => this.setState({ error: null })}
+          >
+            Try to recover
+          </button>
+        </div>
+      </div>
+    );
+  }
+}
 
 function useKeyboardShortcuts() {
   const {
@@ -34,6 +70,9 @@ function useKeyboardShortcuts() {
 
       if (!mod) return;
 
+      // Always intercept Cmd+W to prevent Electron closing the window
+      if (e.key === "w") e.preventDefault();
+
       // Don't fire shortcuts when settings modal is open
       if (state.settingsOpen && e.key !== ",") return;
 
@@ -53,6 +92,10 @@ function useKeyboardShortcuts() {
         if (e.key === "e") {
           e.preventDefault();
           state.setEditMode(!state.editMode);
+          return;
+        }
+        if (e.key === "w" && state.activeTab) {
+          state.closeTab(state.activeTab);
           return;
         }
         return; // suppress all other shortcuts while editing
@@ -121,7 +164,6 @@ function useKeyboardShortcuts() {
           break;
         case "w":
           if (state.activeTab) {
-            e.preventDefault();
             state.closeTab(state.activeTab);
           }
           break;
@@ -383,17 +425,19 @@ export function App() {
   const focusMode = useAppStore((s) => s.focusMode);
 
   return (
-    <div className={`app ${focusMode ? "focus-mode" : ""}`}>
-      <Toolbar />
-      <div className="app-body">
-        <Sidebar />
-        <main className="main-content">
-          <TabBar />
-          <MarkdownPreview />
-        </main>
-        <DocumentOutline />
+    <ErrorBoundary>
+      <div className={`app ${focusMode ? "focus-mode" : ""}`}>
+        <Toolbar />
+        <div className="app-body">
+          <Sidebar />
+          <main className="main-content">
+            <TabBar />
+            <MarkdownPreview />
+          </main>
+          <DocumentOutline />
+        </div>
+        <Settings />
       </div>
-      <Settings />
-    </div>
+    </ErrorBoundary>
   );
 }

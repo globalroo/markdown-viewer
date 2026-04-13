@@ -852,11 +852,19 @@ test("printing from edit mode shows preview content", async () => {
   // Emulate print media
   await page.emulateMedia({ media: "print" });
 
-  // Preview content should be visible (forced by print CSS)
-  await expect(page.locator(".preview-content")).toBeVisible();
+  // Preview content should be display:block (forced by print CSS !important)
+  await expect
+    .poll(() => page.locator(".preview-content").evaluate(
+      (el) => getComputedStyle(el).display
+    ))
+    .toBe("block");
 
-  // Textarea should be hidden
-  await expect(page.locator(".edit-textarea")).toBeHidden();
+  // Textarea should be display:none in print
+  await expect
+    .poll(() => page.locator(".edit-textarea").evaluate(
+      (el) => getComputedStyle(el).display
+    ))
+    .toBe("none");
 });
 
 // ---------------------------------------------------------------------------

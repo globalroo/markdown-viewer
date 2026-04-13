@@ -965,8 +965,7 @@ export function MarkdownPreview() {
           />
         )}
         <div
-          className={`preview-content${previewMode === "collapsible" && sectionModel ? " preview-content-hidden" : ""}`}
-          style={editMode || (previewMode === "collapsible" && sectionModel) ? { display: "none" } : undefined}
+          className={`preview-content${editMode || (previewMode === "collapsible" && sectionModel) ? " preview-content-hidden" : ""}`}
           dangerouslySetInnerHTML={{ __html:viewHtml }}
           onClick={handlePreviewClick}
         />
