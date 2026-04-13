@@ -269,7 +269,6 @@ export function MarkdownPreview() {
   const setEditMode = useAppStore((s) => s.setEditMode);
   const setEditContent = useAppStore((s) => s.setEditContent);
   const styleCheckEnabled = useAppStore((s) => s.styleCheckEnabled);
-  const toggleStyleCheck = useAppStore((s) => s.toggleStyleCheck);
   const previewMode = useAppStore((s) => s.previewMode);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -788,7 +787,7 @@ export function MarkdownPreview() {
     const rootInlineStyle = root.style.cssText;
     const warmFilter = root.classList.contains("warm-filter");
     await window.api.exportHTML(portableHtml, css, theme, font, rootInlineStyle, warmFilter);
-  }, [html, editMode, editContent, selectedFile, sectionModel]);
+  }, [html, editMode, editContent, selectedFile]);
 
   const handleExportPDF = useCallback(async () => {
     await window.api.exportPDF();
@@ -822,7 +821,7 @@ export function MarkdownPreview() {
     const rootInlineStyle = root.style.cssText;
     const warmFilter = root.classList.contains("warm-filter");
     await window.api.exportDOCX(portableHtml, css, theme, font, rootInlineStyle, warmFilter);
-  }, [html, editMode, editContent, selectedFile, sectionModel]);
+  }, [html, editMode, editContent, selectedFile]);
 
   const handleSave = useCallback(async () => {
     if (!selectedFile || !editDirty) return;

@@ -342,7 +342,7 @@ function countSyllables(word: string): number {
   if (w.length <= 2) return 1;
 
   // Remove trailing silent e
-  let working = w.replace(/e$/, "");
+  const working = w.replace(/e$/, "");
   // Count vowel groups
   const vowelGroups = working.match(/[aeiouy]+/g);
   const count = vowelGroups ? vowelGroups.length : 1;

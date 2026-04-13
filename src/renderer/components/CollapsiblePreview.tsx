@@ -178,7 +178,13 @@ export function CollapsiblePreview({ sectionModel, selectedFile, onClick }: Coll
   });
   const loadGenRef = useRef(0); // generation counter to prevent stale async loads
   const fileDir = selectedFile.replace(/[/\\][^/\\]+$/, "");
-  const links = sectionModel.annotatedTokens.links || {};
+  // Stabilise `links` reference: `|| {}` allocates a fresh empty object each
+  // render when annotatedTokens.links is missing, which would invalidate the
+  // useMemo deps below on every render.
+  const links = useMemo(
+    () => sectionModel.annotatedTokens.links || {},
+    [sectionModel.annotatedTokens.links],
+  );
 
   // Convert expanded set to record for IPC
   const expandedToRecord = useCallback((expanded: Set<string>): Record<string, boolean> => {
@@ -291,7 +297,7 @@ export function CollapsiblePreview({ sectionModel, selectedFile, onClick }: Coll
       scheduleSave(selectedFile, next);
       return next;
     });
-  }, [selectedFile, scheduleSave]);
+  }, [selectedFile, scheduleSave, searchExpanded]);
 
   const expandAll = useCallback(() => {
     if (searchExpanded) return;

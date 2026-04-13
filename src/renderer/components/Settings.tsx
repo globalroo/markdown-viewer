@@ -1,5 +1,5 @@
-import { useEffect, useRef, useCallback, useState } from "react";
-import { useAppStore, THEMES, FONTS, type ThemeId, type FontId } from "../store";
+import { useEffect, useRef } from "react";
+import { useAppStore, THEMES, FONTS, type ThemeId } from "../store";
 
 export function Settings() {
   const { theme, setTheme, font, setFont, contentWidth, setContentWidth, lineHeight, setLineHeight, warmFilter, toggleWarmFilter, sidebarFontSize, setSidebarFontSize, settingsOpen, toggleSettings, customCSSPath, setCustomCSS, clearCustomCSS: storeClearCustomCSS } =

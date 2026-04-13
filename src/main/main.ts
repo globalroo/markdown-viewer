@@ -13,7 +13,6 @@ import { pathToFileURL } from "url";
 import { embedLocalImages } from "./embedLocalImages";
 import {
   type LinkIndexState,
-  buildLinkIndex,
   buildLinkIndexAsync,
   updateLinkIndexForFile,
   removeFileFromIndex,

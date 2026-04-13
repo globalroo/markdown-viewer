@@ -270,8 +270,6 @@ function ContentSearchResults({
   query: string;
   isSearching: boolean;
 }) {
-  const { selectFile } = useAppStore();
-
   // TODO(Issue 9): When clicking a content search result in collapsible mode,
   // the matched content may be inside a collapsed section. This requires
   // cross-component communication to expand the relevant section. For now,
@@ -285,7 +283,7 @@ function ContentSearchResults({
       store.selectFile(result.filePath);
       // TODO: scroll to approximate line position after content loads
     },
-    [selectFile]
+    []
   );
 
   // Group results by file
